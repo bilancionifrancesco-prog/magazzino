@@ -498,15 +498,279 @@
         .toast-success { border-left: 3px solid var(--success); }
         .toast-error { border-left: 3px solid var(--danger); }
 
-        /* Responsive */
+        /* Responsive — Desktop */
         @media (max-width: 1024px) { .main-container { grid-template-columns: 1fr; } .sidebar { order: -1; } }
-        @media (max-width: 640px) { .header-content { flex-wrap: wrap; } .search-container { order: 3; max-width: 100%; width: 100%; margin-top: 1rem; } .main-container { padding: 1rem; } }
 
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-primary); }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ===== MOBILE RESPONSIVE (max 768px) ===== */
+        @media (max-width: 768px) {
+
+            /* Body padding for bottom nav */
+            body { padding-bottom: 70px; }
+
+            /* Header mobile */
+            .header { padding: 0.75rem 1rem; }
+
+            .header-content {
+                display: grid;
+                grid-template-columns: auto 1fr auto;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .logo span { display: none; }
+            .logo-icon { width: 36px; height: 36px; }
+
+            .search-container { max-width: 100%; }
+            .search-input { padding: 0.6rem 0.75rem 0.6rem 2.25rem; font-size: 0.85rem; }
+
+            /* Hide desktop header actions — show only avatar + hamburger */
+            .header-actions { gap: 0.5rem; }
+            .header-actions .btn { display: none; }
+            .header-actions #syncIndicator { display: none; }
+            .header-actions .user-menu { display: flex; }
+
+            /* Hamburger menu button */
+            .hamburger-btn {
+                display: flex !important;
+                align-items: center; justify-content: center;
+                width: 36px; height: 36px;
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 1.1rem;
+                color: var(--text-primary);
+            }
+
+            /* Mobile dropdown menu */
+            .mobile-menu {
+                position: fixed;
+                top: 0; right: 0; bottom: 0;
+                width: 280px;
+                background: var(--bg-secondary);
+                border-left: 1px solid var(--border);
+                z-index: 9998;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                padding: 1.5rem 1rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .mobile-menu.open { transform: translateX(0); }
+
+            .mobile-menu-overlay {
+                position: fixed; inset: 0;
+                background: rgba(0,0,0,0.6);
+                z-index: 9997;
+                display: none;
+            }
+            .mobile-menu-overlay.open { display: block; }
+
+            .mobile-menu-header {
+                display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 1rem;
+                padding-bottom: 1rem;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .mobile-menu-title {
+                font-family: 'Space Mono', monospace;
+                color: var(--accent);
+                font-weight: 700;
+            }
+
+            .mobile-menu-close {
+                background: none; border: none;
+                color: var(--text-muted); font-size: 1.5rem;
+                cursor: pointer;
+            }
+
+            .mobile-menu-item {
+                width: 100%;
+                padding: 0.875rem 1rem;
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                color: var(--text-primary);
+                font-family: inherit; font-size: 0.95rem;
+                text-align: left; cursor: pointer;
+                display: flex; align-items: center; gap: 0.75rem;
+                transition: all 0.2s;
+            }
+            .mobile-menu-item:hover { background: var(--bg-card); border-color: var(--accent); }
+
+            .mobile-sync-status {
+                margin-top: auto;
+                padding: 0.75rem;
+                text-align: center;
+                font-size: 0.8rem;
+                color: var(--text-muted);
+            }
+
+            /* Warehouse tabs mobile */
+            .warehouse-tabs { padding-top: 0.5rem; gap: 0.25rem; padding: 0.5rem 1rem 0; }
+            .warehouse-tab {
+                padding: 0.625rem 0.5rem;
+                font-size: 0.75rem;
+                letter-spacing: 0;
+                border-radius: 6px 6px 0 0;
+            }
+
+            /* Main container mobile */
+            .main-container { padding: 0.75rem; gap: 1rem; grid-template-columns: 1fr; }
+            .main-container.no-sidebar { grid-template-columns: 1fr; }
+
+            /* Sidebar mobile — collassabile */
+            .sidebar { gap: 0.75rem; }
+            .sidebar-toggle-btn {
+                display: flex !important;
+                width: 100%;
+                padding: 0.75rem 1rem;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                color: var(--text-secondary);
+                font-family: inherit; font-size: 0.875rem;
+                cursor: pointer;
+                align-items: center; justify-content: space-between;
+            }
+            .sidebar-collapsible { display: none; }
+            .sidebar-collapsible.open { display: flex; flex-direction: column; gap: 0.75rem; }
+
+            /* Dashboard card mobile */
+            .dashboard-card { padding: 1rem; }
+            .dashboard-stat { font-size: 1.5rem; }
+
+            /* Categories card mobile */
+            .categories-card { font-size: 0.9rem; }
+            .category-btn { padding: 0.75rem 1rem; font-size: 0.875rem; }
+            .subcategory-btn { padding: 0.625rem 1rem 0.625rem 1.75rem; font-size: 0.825rem; }
+
+            /* Content header mobile */
+            .content-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+            .content-header > div:last-child {
+                display: flex; flex-wrap: wrap; gap: 0.5rem; width: 100%;
+            }
+            .content-header .btn { flex: 1; justify-content: center; min-width: 120px; }
+            .content-title { font-size: 1.2rem; }
+
+            /* Table mobile — card layout */
+            .table-container { border-radius: 8px; }
+            .table thead { display: none; }
+            .table tbody tr {
+                display: flex;
+                flex-direction: column;
+                padding: 0.875rem 1rem;
+                border-bottom: 1px solid var(--border);
+                gap: 0.4rem;
+            }
+            .table tbody tr:last-child { border-bottom: none; }
+            .table tbody td {
+                padding: 0;
+                border: none;
+                font-size: 0.875rem;
+            }
+            .table tbody td:first-child { font-size: 1rem; }
+            .table tbody td .actions-cell { margin-top: 0.5rem; flex-wrap: wrap; }
+
+            /* Unit detail mobile */
+            .unit-detail-header {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            .detail-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+            .unit-detail-body { padding: 1rem; }
+
+            /* Modal mobile */
+            .modal {
+                width: 95%;
+                max-height: 85vh;
+                border-radius: 12px;
+            }
+            .modal-body { padding: 1rem; }
+            .modal-header { padding: 1rem; }
+            .modal-footer { padding: 0.75rem 1rem; }
+
+            /* Jobs mobile */
+            .jobs-container { max-width: 100%; }
+            .job-header { flex-direction: column; gap: 0.75rem; }
+            .job-header > div:last-child { flex-wrap: wrap; }
+            .external-material-row {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            .external-material-row button { grid-column: 2; }
+
+            /* Toast mobile */
+            .toast-container { bottom: 80px; right: 1rem; left: 1rem; }
+            .toast { font-size: 0.875rem; }
+
+            /* Home cards mobile */
+            .home-cards-container { flex-direction: column; align-items: center; }
+            .home-card { max-width: 100%; }
+
+            /* Bottom navigation bar */
+            .bottom-nav {
+                display: flex !important;
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                height: 64px;
+                background: var(--bg-secondary);
+                border-top: 1px solid var(--border);
+                z-index: 200;
+                align-items: stretch;
+            }
+
+            .bottom-nav-item {
+                flex: 1;
+                display: flex; flex-direction: column;
+                align-items: center; justify-content: center;
+                gap: 0.2rem;
+                background: none; border: none;
+                color: var(--text-muted);
+                font-family: inherit; font-size: 0.65rem;
+                cursor: pointer; transition: all 0.2s;
+                padding: 0.5rem;
+            }
+
+            .bottom-nav-item.active { color: var(--accent); }
+            .bottom-nav-item:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+
+            .bottom-nav-icon { font-size: 1.3rem; line-height: 1; }
+
+            /* Scanner page mobile */
+            #reader { max-height: 55vh; }
+            .scanner-result { padding: 1rem; }
+
+            /* QR modal mobile */
+            .qr-container { padding: 0.5rem; }
+            #qrCodeCanvas canvas, #qrCodeCanvas img { max-width: 180px !important; max-height: 180px !important; }
+        }
+
+        /* Hide mobile-only elements on desktop */
+        .hamburger-btn { display: none; }
+        .bottom-nav { display: none; }
+        .sidebar-toggle-btn { display: none; }
+        .mobile-menu { display: none !important; }
+        .mobile-menu-overlay { display: none !important; }
+        @media (max-width: 768px) {
+            .mobile-menu { display: flex !important; flex-direction: column; }
+            .mobile-menu.open { transform: translateX(0); }
+            .mobile-menu-overlay { display: none; }
+            .mobile-menu-overlay.open { display: block !important; }
+        }
     </style>
 </head>
 <body>
@@ -572,6 +836,8 @@
                 <div class="user-menu">
                     <div class="user-avatar" id="userAvatar" onclick="signOut()" title="Clicca per disconnetterti">?</div>
                 </div>
+                <!-- Hamburger — solo mobile -->
+                <button class="hamburger-btn" onclick="openMobileMenu()" aria-label="Menu">☰</button>
             </div>
         </div>
         <!-- Warehouse Tabs -->
@@ -581,6 +847,44 @@
             <button class="warehouse-tab" data-warehouse="cp" onclick="selectWarehouse('cp')">CP</button>
         </div>
     </header>
+
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+
+    <!-- Mobile Slide-in Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <div class="mobile-menu-header">
+            <span class="mobile-menu-title">MENU</span>
+            <button class="mobile-menu-close" onclick="closeMobileMenu()">×</button>
+        </div>
+        <button class="mobile-menu-item" onclick="closeMobileMenu(); openScannerPage()">📷 Scansiona QR</button>
+        <button class="mobile-menu-item" onclick="closeMobileMenu(); openJobsView()">📋 Lavori</button>
+        <button class="mobile-menu-item" onclick="closeMobileMenu(); openSettingsModal()">⚙ Gestione Categorie</button>
+        <button class="mobile-menu-item" onclick="closeMobileMenu(); exportData()">📥 Esporta Backup</button>
+        <button class="mobile-menu-item" onclick="closeMobileMenu(); document.getElementById('importFile').click()">📤 Importa Backup</button>
+        <div class="mobile-sync-status" id="mobileSyncStatus">✓ Sincronizzato</div>
+        <button class="mobile-menu-item" style="color: var(--danger); border-color: rgba(255,71,87,0.3); margin-top: auto;" onclick="closeMobileMenu(); signOut()">🚪 Disconnetti</button>
+    </div>
+
+    <!-- Bottom Navigation Bar — solo mobile -->
+    <nav class="bottom-nav" id="bottomNav">
+        <button class="bottom-nav-item active" id="bnHome" onclick="bottomNavHome()">
+            <span class="bottom-nav-icon">🏠</span>
+            <span>Home</span>
+        </button>
+        <button class="bottom-nav-item" id="bnScan" onclick="openScannerPage()">
+            <span class="bottom-nav-icon">📷</span>
+            <span>Scansiona</span>
+        </button>
+        <button class="bottom-nav-item" id="bnJobs" onclick="bottomNavJobs()">
+            <span class="bottom-nav-icon">📋</span>
+            <span>Lavori</span>
+        </button>
+        <button class="bottom-nav-item" id="bnMenu" onclick="openMobileMenu()">
+            <span class="bottom-nav-icon">☰</span>
+            <span>Menu</span>
+        </button>
+    </nav>
 
     <!-- Main Container -->
     <div class="main-container no-sidebar" id="mainContainer">
@@ -633,6 +937,7 @@ const AUTHORIZED_EMAILS = [
     // "r.bilancioni@gmail.com",
     // "giovannibilancion@gmail.com"
 ];
+
 // =====================================================
 // INIT FIREBASE (solo se configurato)
 // =====================================================
@@ -2259,6 +2564,66 @@ function importData(event) {
         startApp(null);
     }
 })();
+
+// =====================================================
+// MOBILE UI FUNCTIONS
+// =====================================================
+function openMobileMenu() {
+    document.getElementById('mobileMenu').classList.add('open');
+    document.getElementById('mobileMenuOverlay').classList.add('open');
+    // Update sync status in mobile menu
+    const syncEl = document.getElementById('syncIndicator');
+    if (syncEl) {
+        document.getElementById('mobileSyncStatus').textContent = syncEl.textContent.trim();
+    }
+}
+
+function closeMobileMenu() {
+    document.getElementById('mobileMenu').classList.remove('open');
+    document.getElementById('mobileMenuOverlay').classList.remove('open');
+}
+
+function bottomNavHome() {
+    setBottomNavActive('bnHome');
+    goToGeneralHome();
+}
+
+function bottomNavJobs() {
+    setBottomNavActive('bnJobs');
+    openJobsView();
+}
+
+function setBottomNavActive(id) {
+    document.querySelectorAll('.bottom-nav-item').forEach(btn => btn.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+}
+
+// Update bottom nav active state when navigating
+const _origGoToGeneralHome = goToGeneralHome;
+goToGeneralHome = function() {
+    _origGoToGeneralHome();
+    setBottomNavActive('bnHome');
+};
+
+const _origOpenJobsView = openJobsView;
+openJobsView = function() {
+    _origOpenJobsView();
+    setBottomNavActive('bnJobs');
+};
+
+const _origOpenScannerPage = openScannerPage;
+openScannerPage = function() {
+    setBottomNavActive('bnScan');
+    _origOpenScannerPage();
+};
+
+const _origCloseScanner = closeScanner;
+closeScanner = function() {
+    _origCloseScanner();
+    setBottomNavActive('bnHome');
+};
+
 </script>
 </body>
 </html>
