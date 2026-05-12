@@ -1,0 +1,2265 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Magazzino Noleggio v4</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDK (compat v10 — stabile con questo codice) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+    <!-- QR Code generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- QR Code scanner -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #141416;
+            --bg-tertiary: #303030;
+            --bg-card: #1e1e21;
+            --border: #2a2a2e;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a0a0a5;
+            --text-muted: #6b6b70;
+            --accent: #00d4aa;
+            --accent-hover: #00f5c4;
+            --warning: #ffaa00;
+            --danger: #ff4757;
+            --success: #00d4aa;
+            --info: #3b82f6;
+        }
+
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        /* ===== LOGIN SCREEN ===== */
+        #loginScreen {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--bg-primary);
+            display: flex; align-items: center; justify-content: center;
+        }
+        #loginScreen.hidden { display: none; }
+
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 3rem 2.5rem;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .login-logo {
+            width: 64px; height: 64px;
+            background: var(--accent);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .login-title {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            font-size: 0.95rem;
+        }
+
+        .btn-google {
+            width: 100%;
+            padding: 1rem;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+            transition: all 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        .btn-google:hover { background: #f0f0f0; transform: translateY(-1px); }
+        .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .google-icon {
+            width: 20px; height: 20px;
+        }
+
+        .login-error {
+            color: var(--danger);
+            font-size: 0.875rem;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(255,71,87,0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .login-loading {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+
+        /* ===== SYNC INDICATOR ===== */
+        .sync-indicator {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 99px;
+            font-family: 'Space Mono', monospace;
+        }
+        .sync-indicator.synced { background: rgba(0,212,170,0.1); color: var(--success); }
+        .sync-indicator.syncing { background: rgba(255,170,0,0.1); color: var(--warning); }
+        .sync-indicator.error { background: rgba(255,71,87,0.1); color: var(--danger); }
+        .sync-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: currentColor;
+        }
+        .sync-dot.pulse { animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ===== USER MENU ===== */
+        .user-menu {
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .user-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--accent);
+            color: var(--bg-primary);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: 700;
+            cursor: pointer;
+            border: 2px solid var(--border);
+            overflow: hidden;
+        }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* ===== SCANNER PAGE ===== */
+        #scannerPage {
+            position: fixed; inset: 0; z-index: 500;
+            background: #000;
+            display: flex; flex-direction: column;
+        }
+        #scannerPage.hidden { display: none; }
+
+        .scanner-header {
+            padding: 1rem 1.5rem;
+            background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .scanner-title {
+            font-family: 'Space Mono', monospace;
+            color: var(--accent);
+            font-size: 1rem;
+        }
+
+        #reader {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #reader > div { border-radius: 0 !important; }
+
+        .scanner-result {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 1.5rem;
+            min-height: 160px;
+        }
+
+        .scanner-result-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .scanner-unit-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+
+        .scanner-unit-name { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .scanner-unit-serial { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+
+        .scanner-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+        /* ===== QR MODAL ===== */
+        .qr-container {
+            display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
+            padding: 1rem;
+        }
+        #qrCodeCanvas {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+        .qr-label {
+            text-align: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+        }
+
+        .logo {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent);
+            display: flex; align-items: center; gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: var(--accent);
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--bg-primary);
+            font-size: 1rem;
+        }
+
+        .search-container { flex: 1; max-width: 500px; }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,212,170,0.1); }
+        .search-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .search-wrapper { position: relative; }
+
+        .search-wrapper::before {
+            content: "⌕";
+            position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); font-size: 1rem;
+        }
+
+        .header-actions { display: flex; gap: 0.75rem; align-items: center; }
+
+        /* Warehouse Tabs */
+        .warehouse-tabs {
+            max-width: 1600px; margin: 0 auto;
+            display: flex; gap: 0; padding-top: 1rem;
+        }
+
+        .warehouse-tab {
+            flex: 1;
+            padding: 0.875rem 1.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            color: var(--text-secondary);
+            font-family: inherit; font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            text-transform: uppercase; letter-spacing: 0.03em;
+        }
+
+        .warehouse-tab:first-child { border-radius: 8px 0 0 0; }
+        .warehouse-tab:last-child { border-radius: 0 8px 0 0; }
+        .warehouse-tab:hover { background: var(--bg-card); color: var(--text-primary); }
+        .warehouse-tab.active { background: #f5c518; color: #000; border-color: #f5c518; }
+
+        /* Buttons */
+        .btn {
+            padding: 0.625rem 1rem;
+            border: none; border-radius: 6px;
+            font-family: inherit; font-size: 0.875rem; font-weight: 500;
+            cursor: pointer; transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+
+        .btn-primary { background: var(--accent); color: var(--bg-primary); }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--bg-card); border-color: var(--text-muted); }
+        .btn-danger { background: rgba(255,71,87,0.1); color: var(--danger); border: 1px solid rgba(255,71,87,0.3); }
+        .btn-danger:hover { background: rgba(255,71,87,0.2); }
+        .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+        .btn-warning { background: rgba(255,170,0,0.1); color: var(--warning); border: 1px solid rgba(255,170,0,0.3); }
+        .btn-warning:hover { background: rgba(255,170,0,0.2); }
+
+        /* Main Layout */
+        .main-container {
+            max-width: 1600px; margin: 0 auto; padding: 2rem;
+            display: grid; grid-template-columns: 280px 1fr; gap: 2rem;
+        }
+        .main-container.no-sidebar { grid-template-columns: 1fr; }
+
+        .general-home { text-align: center; padding: 2rem 0; }
+        .home-content { margin-top: 2rem; }
+
+        .home-cards-container {
+            display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem;
+        }
+
+        .home-card { max-width: 350px; width: 100%; text-align: left; }
+        .home-card.clickable { cursor: pointer; transition: all 0.2s; }
+        .home-card.clickable:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .click-hint { margin-top: 1rem; font-size: 0.8rem; color: var(--accent); }
+
+        /* Jobs View */
+        .jobs-container { max-width: 1200px; margin: 0 auto; }
+        .job-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .job-card.completed { opacity: 0.6; }
+        .job-header { padding: 1.25rem; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); }
+        .job-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .job-date { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--warning); }
+        .job-date.past { color: var(--danger); }
+        .job-body { padding: 1.25rem; }
+        .job-section { margin-bottom: 1.25rem; }
+        .job-section:last-child { margin-bottom: 0; }
+        .job-section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+        .job-notes { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
+        .material-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .material-item { background: var(--bg-tertiary); padding: 0.75rem 1rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        .material-item.external { border-left: 3px solid var(--warning); }
+        .material-name { font-weight: 500; }
+        .material-details { color: var(--text-muted); font-size: 0.8rem; }
+        .material-qty { font-family: 'Space Mono', monospace; color: var(--accent); }
+        .job-status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+        .job-status-badge.pending { background: rgba(255,170,0,0.1); color: var(--warning); }
+        .job-status-badge.completed { background: rgba(0,212,170,0.1); color: var(--success); }
+
+        .material-selector { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; max-height: 300px; overflow-y: auto; }
+        .material-selector-item { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .material-selector-item:last-child { border-bottom: none; }
+        .material-selector-item input[type="number"] { width: 60px; padding: 0.25rem 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-family: 'Space Mono', monospace; }
+
+        .external-materials-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+        .external-material-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 0.5rem; align-items: center; }
+        .external-material-row input { padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-family: inherit; font-size: 0.85rem; }
+        .external-material-row button { padding: 0.5rem; background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); border-radius: 4px; color: var(--danger); cursor: pointer; }
+        .add-external-btn { margin-top: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-tertiary); border: 1px dashed var(--border); border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 0.85rem; width: 100%; transition: all 0.2s; }
+        .add-external-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .show-completed-toggle { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; }
+        .show-completed-toggle input { accent-color: var(--accent); }
+
+        /* Sidebar */
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+        .dashboard-card { background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+        .dashboard-card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+        .dashboard-stat { font-family: 'Space Mono', monospace; font-size: 2rem; font-weight: 700; color: var(--accent); }
+        .dashboard-label { font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .dashboard-list { margin-top: 1rem; max-height: 200px; overflow-y: auto; }
+        .dashboard-list-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; }
+        .dashboard-list-item:last-child { border-bottom: none; }
+        .dashboard-list-item .date { color: var(--warning); font-family: 'Space Mono', monospace; font-size: 0.75rem; }
+
+        /* Categories */
+        .categories-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .categories-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .categories-header h3 { font-size: 0.875rem; font-weight: 600; }
+        .category-list { list-style: none; }
+        .category-item { border-bottom: 1px solid var(--border); }
+        .category-item:last-child { border-bottom: none; }
+        .category-btn { width: 100%; padding: 0.875rem 1.25rem; background: none; border: none; color: var(--text-primary); font-family: inherit; font-size: 0.9rem; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s; }
+        .category-btn:hover { background: var(--bg-tertiary); }
+        .category-btn.active { background: var(--bg-tertiary); color: var(--accent); border-left: 3px solid var(--accent); }
+        .category-arrow { transition: transform 0.2s; font-size: 0.7rem; color: var(--text-muted); }
+        .category-item.expanded .category-arrow { transform: rotate(90deg); }
+        .subcategory-list { list-style: none; background: var(--bg-primary); display: none; }
+        .category-item.expanded .subcategory-list { display: block; }
+        .subcategory-btn { width: 100%; padding: 0.75rem 1.25rem 0.75rem 2rem; background: none; border: none; color: var(--text-secondary); font-family: inherit; font-size: 0.85rem; text-align: left; cursor: pointer; transition: all 0.2s; }
+        .subcategory-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .subcategory-btn.active { color: var(--accent); background: var(--bg-tertiary); }
+
+        /* Content */
+        .content { display: flex; flex-direction: column; gap: 1.5rem; }
+        .content-header { display: flex; justify-content: space-between; align-items: center; }
+        .content-title { font-size: 1.5rem; font-weight: 600; }
+        .breadcrumb { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .breadcrumb span { color: var(--accent); }
+
+        /* Table */
+        .table-container { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th { padding: 1rem 1.25rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: var(--bg-tertiary); border-bottom: 1px solid var(--border); }
+        .table td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        .table tr:last-child td { border-bottom: none; }
+        .table tr:hover td { background: var(--bg-tertiary); }
+        .table-clickable { cursor: pointer; }
+
+        .qty-badge { display: inline-block; padding: 0.25rem 0.625rem; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 0.8rem; font-weight: 600; }
+        .qty-total { background: rgba(59,130,246,0.1); color: var(--info); }
+        .qty-available { background: rgba(0,212,170,0.1); color: var(--success); }
+        .qty-warning { background: rgba(255,170,0,0.1); color: var(--warning); }
+
+        .status-badge { display: inline-block; padding: 0.25rem 0.625rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+        .status-available { background: rgba(0,212,170,0.1); color: var(--success); }
+        .status-rented { background: rgba(255,170,0,0.1); color: var(--warning); }
+        .actions-cell { display: flex; gap: 0.5rem; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; transform: translateY(20px); transition: transform 0.3s; }
+        .modal-overlay.active .modal { transform: translateY(0); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-size: 1.25rem; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; padding: 0.25rem; line-height: 1; }
+        .modal-close:hover { color: var(--text-primary); }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
+
+        /* Forms */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem 1rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 0.9rem; transition: all 0.2s; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--accent); }
+        .form-textarea { min-height: 100px; resize: vertical; }
+
+        /* Unit Detail */
+        .unit-detail { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .unit-detail-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+        .unit-detail-info h2 { font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; }
+        .unit-detail-meta { margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary); }
+        .unit-detail-body { padding: 1.5rem; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .detail-item { background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; }
+        .detail-item-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .detail-item-value { font-size: 1rem; font-weight: 500; }
+        .history-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .history-timeline { position: relative; padding-left: 1.5rem; }
+        .history-timeline::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--border); }
+        .history-item { position: relative; padding-bottom: 1.5rem; }
+        .history-item:last-child { padding-bottom: 0; }
+        .history-item::before { content: ''; position: absolute; left: -1.5rem; top: 0.25rem; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; transform: translateX(-4px); }
+        .history-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+        .history-item-location { font-weight: 500; }
+        .history-item-date { font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Search Results */
+        .search-results { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+        .search-result-item { padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s; }
+        .search-result-item:hover { background: var(--bg-card); transform: translateX(4px); }
+        .search-result-title { font-weight: 500; margin-bottom: 0.25rem; }
+        .search-result-meta { font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+        .empty-state-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        .empty-state h3 { font-size: 1.125rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+
+        /* Toast */
+        .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 2000; display: flex; flex-direction: column; gap: 0.75rem; }
+        .toast { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-success { border-left: 3px solid var(--success); }
+        .toast-error { border-left: 3px solid var(--danger); }
+
+        /* Responsive */
+        @media (max-width: 1024px) { .main-container { grid-template-columns: 1fr; } .sidebar { order: -1; } }
+        @media (max-width: 640px) { .header-content { flex-wrap: wrap; } .search-container { order: 3; max-width: 100%; width: 100%; margin-top: 1rem; } .main-container { padding: 1rem; } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="loginScreen">
+    <div class="login-card">
+        <div class="login-logo">◈</div>
+        <div class="login-title">MAGAZZINO</div>
+        <div class="login-subtitle">Gestionale Noleggio v4<br>Accedi con il tuo account Google autorizzato</div>
+        <button class="btn-google" id="googleLoginBtn" onclick="signInWithGoogle()">
+            <svg class="google-icon" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Accedi con Google
+        </button>
+        <div class="login-error" id="loginError"></div>
+        <div class="login-loading" id="loginLoading" style="display:none">⏳ Verifica credenziali...</div>
+    </div>
+</div>
+
+<!-- ===== SCANNER PAGE ===== -->
+<div id="scannerPage" class="hidden">
+    <div class="scanner-header">
+        <span class="scanner-title">📷 SCANNER QR</span>
+        <button class="btn btn-secondary btn-sm" onclick="closeScanner()">✕ Chiudi</button>
+    </div>
+    <div id="reader"></div>
+    <div class="scanner-result">
+        <div class="scanner-result-title">RISULTATO SCANSIONE</div>
+        <div id="scannerResultContent">
+            <p style="color: var(--text-muted);">Punta la fotocamera verso un QR code del prodotto...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="mainApp" style="display:none">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo" onclick="goToGeneralHome()">
+                <div class="logo-icon">◈</div>
+                <span>MAGAZZINO</span>
+            </div>
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <input type="text" class="search-input" id="globalSearch" placeholder="Cerca per nome modello o numero di serie..." disabled>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="syncIndicator" class="sync-indicator synced">
+                    <span class="sync-dot"></span> Sincronizzato
+                </span>
+                <button class="btn btn-secondary" onclick="openScannerPage()" title="Scanner QR">📷 Scansiona</button>
+                <button class="btn btn-secondary" onclick="exportData()">📥 Esporta</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📤 Importa</button>
+                <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+                <button class="btn btn-secondary" onclick="openSettingsModal()">⚙ Gestione</button>
+                <div class="user-menu">
+                    <div class="user-avatar" id="userAvatar" onclick="signOut()" title="Clicca per disconnetterti">?</div>
+                </div>
+            </div>
+        </div>
+        <!-- Warehouse Tabs -->
+        <div class="warehouse-tabs" id="warehouseTabs">
+            <button class="warehouse-tab" data-warehouse="multimedia" onclick="selectWarehouse('multimedia')">Multimedia museum</button>
+            <button class="warehouse-tab" data-warehouse="beacon" onclick="selectWarehouse('beacon')">Beacon</button>
+            <button class="warehouse-tab" data-warehouse="cp" onclick="selectWarehouse('cp')">CP</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container no-sidebar" id="mainContainer">
+        <aside class="sidebar" id="sidebar" style="display: none;">
+            <div class="dashboard-card">
+                <h3>Rientri prossimi 30 giorni</h3>
+                <div class="dashboard-stat" id="returnsCount">0</div>
+                <div class="dashboard-label">prodotti in rientro</div>
+                <div class="dashboard-list" id="returnsList"></div>
+            </div>
+            <div class="categories-card">
+                <div class="categories-header">
+                    <h3>Categorie</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="openAddCategoryModal()">+</button>
+                </div>
+                <ul class="category-list" id="categoryList"></ul>
+            </div>
+        </aside>
+        <main class="content" id="mainContent"></main>
+    </div>
+</div>
+
+<!-- Modal Container -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// =====================================================
+// FIREBASE CONFIG
+// Sostituisci il blocco qui sotto con il tuo firebaseConfig
+// =====================================================
+const firebaseConfig = {
+    // FIREBASE CONFIG — INCOLLA QUI IL TUO CODICE
+    // apiKey: "AIza...",
+    // authDomain: "magazzino-xxx.firebaseapp.com",
+    // projectId: "magazzino-xxx",
+    // storageBucket: "...",
+    // messagingSenderId: "...",
+    // appId: "..."
+};
+
+// =====================================================
+// EMAIL AUTORIZZATE — aggiungi le email che possono accedere
+// =====================================================
+const AUTHORIZED_EMAILS = [
+    // "tuaemail@gmail.com",
+    // "collega@gmail.com"
+];
+
+// =====================================================
+// INIT FIREBASE (solo se configurato)
+// =====================================================
+let firebaseApp = null;
+let db = null;
+let auth = null;
+let firestoreEnabled = false;
+
+function initFirebase() {
+    try {
+        if (!firebaseConfig.apiKey) {
+            console.warn('Firebase non configurato — uso modalità locale (localStorage)');
+            return false;
+        }
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+        firestoreEnabled = true;
+        console.log('Firebase inizializzato');
+        return true;
+    } catch (e) {
+        console.error('Errore init Firebase:', e);
+        return false;
+    }
+}
+
+// =====================================================
+// DATA VERSIONING & MIGRATION
+// =====================================================
+const CURRENT_VERSION = 4;
+
+function migrateData(data) {
+    const dataVersion = data.version || 0;
+    if (dataVersion >= CURRENT_VERSION) return data;
+    console.log(`Migrazione da v${dataVersion} a v${CURRENT_VERSION}...`);
+
+    if (dataVersion < 1) {
+        if (!data.warehouses) {
+            data.warehouses = [
+                { id: 'multimedia', name: 'Multimedia museum' },
+                { id: 'beacon', name: 'Beacon' },
+                { id: 'cp', name: 'CP' }
+            ];
+        }
+        if (data.categories) {
+            const defaultCatIds = ['proiettori', 'monitor', 'casse', 'player', 'cavi'];
+            data.categories.forEach(cat => {
+                if (defaultCatIds.includes(cat.id)) cat.isDefault = true;
+                if (cat.isDefault === undefined && !cat.warehouseId) cat.isDefault = true;
+            });
+        }
+        if (data.models) {
+            data.models.forEach(model => { if (!model.warehouseId) model.warehouseId = 'multimedia'; });
+        }
+    }
+    if (dataVersion < 2) {
+        if (data.units) {
+            data.units.forEach(unit => {
+                if (unit.purchaseDate === undefined) unit.purchaseDate = null;
+                if (unit.company === undefined) unit.company = null;
+            });
+        }
+    }
+    if (dataVersion < 3) {
+        if (!data.jobs) data.jobs = [];
+    }
+    // v4: no structural changes, just marks new version
+
+    data.version = CURRENT_VERSION;
+    console.log('Migrazione completata!');
+    return data;
+}
+
+const defaultCategories = [
+    { id: 'proiettori', name: 'Proiettori', subcategories: [], isCable: false, isDefault: true },
+    { id: 'monitor', name: 'Monitor', subcategories: [{ id: 'touch', name: 'Touch' }, { id: 'non-touch', name: 'Non Touch' }], isCable: false, isDefault: true },
+    { id: 'casse', name: 'Casse', subcategories: [], isCable: false, isDefault: true },
+    { id: 'player', name: 'Player', subcategories: [], isCable: false, isDefault: true },
+    { id: 'cavi', name: 'Cavi', subcategories: [{ id: 'cavi-rete', name: 'Cavi di rete' }, { id: 'hdmi', name: 'HDMI' }, { id: 'xlr', name: 'XLR' }], isCable: true, isDefault: true }
+];
+
+const defaultData = {
+    version: CURRENT_VERSION,
+    warehouses: [
+        { id: 'multimedia', name: 'Multimedia museum' },
+        { id: 'beacon', name: 'Beacon' },
+        { id: 'cp', name: 'CP' }
+    ],
+    categories: [...defaultCategories],
+    models: [],
+    units: [],
+    movements: [],
+    jobs: []
+};
+
+// =====================================================
+// APP STATE
+// =====================================================
+let appData = null;
+let currentUser = null;
+let currentView = { type: 'generalHome', warehouseId: null, categoryId: null, subcategoryId: null, modelId: null, unitId: null };
+let saveTimeout = null;
+
+// =====================================================
+// SAVE / LOAD DATA
+// =====================================================
+function saveData() {
+    // Always save to localStorage as fallback
+    localStorage.setItem('magazzinoData', JSON.stringify(appData));
+    
+    if (firestoreEnabled && db && currentUser) {
+        setSyncStatus('syncing');
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            saveToFirestore();
+        }, 800); // Debounce 800ms
+    }
+}
+
+async function saveToFirestore() {
+    try {
+        const uid = currentUser.uid;
+        await db.collection('users').doc(uid).collection('data').doc('main').set(appData);
+        setSyncStatus('synced');
+    } catch (e) {
+        console.error('Errore salvataggio Firestore:', e);
+        setSyncStatus('error');
+    }
+}
+
+async function loadFromFirestore() {
+    try {
+        const uid = currentUser.uid;
+        const doc = await db.collection('users').doc(uid).collection('data').doc('main').get();
+        if (doc.exists) {
+            const data = doc.data();
+            appData = migrateData(data);
+            // Sync to localStorage too
+            localStorage.setItem('magazzinoData', JSON.stringify(appData));
+            setSyncStatus('synced');
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error('Errore caricamento Firestore:', e);
+        setSyncStatus('error');
+        return false;
+    }
+}
+
+function setSyncStatus(status) {
+    const el = document.getElementById('syncIndicator');
+    if (!el) return;
+    const labels = { synced: '✓ Sincronizzato', syncing: '⟳ Salvataggio...', error: '✗ Errore sync' };
+    const dot = el.querySelector('.sync-dot');
+    el.className = `sync-indicator ${status}`;
+    el.innerHTML = `<span class="sync-dot ${status === 'syncing' ? 'pulse' : ''}"></span> ${labels[status]}`;
+}
+
+// =====================================================
+// AUTHENTICATION
+// =====================================================
+async function signInWithGoogle() {
+    if (!firestoreEnabled) {
+        // Modalità locale: salta il login
+        startApp(null);
+        return;
+    }
+    const btn = document.getElementById('googleLoginBtn');
+    const errorEl = document.getElementById('loginError');
+    const loadingEl = document.getElementById('loginLoading');
+    
+    btn.disabled = true;
+    errorEl.style.display = 'none';
+    loadingEl.style.display = 'block';
+
+    try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+
+        // Check authorized emails (if list is not empty)
+        if (AUTHORIZED_EMAILS.length > 0 && !AUTHORIZED_EMAILS.includes(user.email)) {
+            await auth.signOut();
+            errorEl.textContent = `Accesso negato. L'email ${user.email} non è autorizzata.`;
+            errorEl.style.display = 'block';
+            btn.disabled = false;
+            loadingEl.style.display = 'none';
+            return;
+        }
+
+        // Authorized!
+        currentUser = user;
+        await startApp(user);
+
+    } catch (e) {
+        console.error('Login error:', e);
+        const msg = e.code ? 'Errore: ' + e.code : (e.message || 'Errore sconosciuto'); errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        loadingEl.style.display = 'none';
+    }
+}
+
+async function signOut() {
+    if (!confirm('Vuoi disconnetterti?')) return;
+    if (firestoreEnabled && auth) {
+        await auth.signOut();
+    }
+    currentUser = null;
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+async function startApp(user) {
+    currentUser = user;
+
+    // Load data
+    let loaded = false;
+    if (firestoreEnabled && user) {
+        loaded = await loadFromFirestore();
+    }
+
+    if (!loaded) {
+        // Fallback: localStorage
+        const stored = localStorage.getItem('magazzinoData');
+        if (stored) {
+            appData = migrateData(JSON.parse(stored));
+        } else {
+            appData = { ...defaultData };
+        }
+    }
+
+    if (!appData.jobs) appData.jobs = [];
+    saveData();
+
+    // Update UI
+    if (user) {
+        const avatar = document.getElementById('userAvatar');
+        if (user.photoURL) {
+            avatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName}">`;
+        } else {
+            avatar.textContent = (user.displayName || user.email || '?')[0].toUpperCase();
+        }
+        avatar.title = `${user.displayName || user.email} — Clicca per disconnetterti`;
+    }
+
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').style.display = 'block';
+
+    goToGeneralHome();
+}
+
+// =====================================================
+// UTILITY FUNCTIONS
+// =====================================================
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function isWithinDays(dateStr, days) {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + days);
+    return date >= now && date <= futureDate;
+}
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : '✗'}</span> ${message}`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// =====================================================
+// QR CODE GENERATOR
+// =====================================================
+function generateQRCode(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    const model = appData.models.find(m => m.id === unit.modelId);
+    if (!unit || !model) return;
+
+    const qrData = `MAGAZZINO:${unit.modelId}|UNIT:${unit.id}|SERIAL:${unit.serialNumber}`;
+
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">🔲 QR Code — ${unit.serialNumber}</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="qr-container">
+                <div id="qrCodeCanvas"></div>
+                <div class="qr-label">
+                    <strong>${model.name}</strong><br>
+                    S/N: ${unit.serialNumber}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-tertiary); padding: 0.5rem 1rem; border-radius: 6px; font-family: 'Space Mono', monospace; word-break: break-all; text-align: center;">
+                    ${qrData}
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content: center; gap: 1rem;">
+            <button class="btn btn-secondary" onclick="downloadQR('${unit.serialNumber}')">💾 Salva immagine</button>
+            <button class="btn btn-primary" onclick="printQRLabel('${unitId}')">🖨️ Stampa etichetta</button>
+        </div>
+    `);
+
+    // Generate QR after modal is rendered
+    setTimeout(() => {
+        const container = document.getElementById('qrCodeCanvas');
+        if (container && typeof QRCode !== 'undefined') {
+            new QRCode(container, {
+                text: qrData,
+                width: 220,
+                height: 220,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+    }, 100);
+}
+
+function downloadQR(serialNumber) {
+    const qrEl = document.querySelector('#qrCodeCanvas canvas') || document.querySelector('#qrCodeCanvas img');
+    if (!qrEl) { showToast('QR non ancora generato', 'error'); return; }
+
+    const unit = appData.units.find(u => u.serialNumber === serialNumber);
+    const model = unit ? appData.models.find(m => m.id === unit.modelId) : null;
+    const modelName = model ? model.name : '';
+
+    let qrSrc = qrEl.tagName === 'CANVAS' ? qrEl.toDataURL('image/png') : qrEl.src;
+
+    const padding = 16;
+    const qrSize = 220;
+    const fontSize1 = 16;
+    const fontSize2 = 13;
+    const totalH = qrSize + padding * 3 + fontSize1 + 8 + fontSize2;
+
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = qrSize + padding * 2;
+    finalCanvas.height = totalH;
+    const ctx = finalCanvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+    const img = new Image();
+    img.onload = function() {
+        ctx.drawImage(img, padding, padding, qrSize, qrSize);
+
+        ctx.fillStyle = '#000000';
+        ctx.font = `bold ${fontSize1}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(modelName, finalCanvas.width / 2, qrSize + padding * 2 + fontSize1 - 4);
+
+        ctx.font = `${fontSize2}px monospace`;
+        ctx.fillStyle = '#444444';
+        ctx.fillText('S/N: ' + serialNumber, finalCanvas.width / 2, qrSize + padding * 2 + fontSize1 + 8 + fontSize2);
+
+        const a = document.createElement('a');
+        a.href = finalCanvas.toDataURL('image/png');
+        a.download = `QR_${serialNumber}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+    img.src = qrSrc;
+}
+
+function printQRLabel(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    const model = appData.models.find(m => m.id === unit.modelId);
+    const canvas = document.querySelector('#qrCodeCanvas canvas') || document.querySelector('#qrCodeCanvas img');
+    if (!canvas) { showToast('QR non ancora generato', 'error'); return; }
+
+    let imgSrc = canvas.tagName === 'CANVAS' ? canvas.toDataURL('image/png') : canvas.src;
+
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Etichetta — ${unit.serialNumber}</title>
+            <style>
+                body { font-family: 'DM Sans', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: white; }
+                .label { text-align: center; padding: 1rem; border: 2px solid #000; border-radius: 8px; max-width: 260px; }
+                .label img { width: 200px; height: 200px; }
+                .label-title { font-size: 0.9rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+                .label-serial { font-family: monospace; font-size: 0.8rem; color: #555; }
+                @media print { @page { margin: 5mm; } }
+            </style>
+        </head>
+        <body>
+            <div class="label">
+                <img src="${imgSrc}" alt="QR Code">
+                <div class="label-title">${model.name}</div>
+                <div class="label-serial">S/N: ${unit.serialNumber}</div>
+            </div>
+            <script>window.onload = () => { window.print(); }<\/script>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+}
+
+// =====================================================
+// QR SCANNER
+// =====================================================
+let html5QrCode = null;
+let scannerActive = false;
+
+function openScannerPage() {
+    document.getElementById('scannerPage').classList.remove('hidden');
+    document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--text-muted);">Punta la fotocamera verso un QR code del prodotto...</p>';
+    
+    setTimeout(() => {
+        startScanner();
+    }, 300);
+}
+
+function closeScanner() {
+    if (html5QrCode && scannerActive) {
+        html5QrCode.stop().catch(() => {});
+        scannerActive = false;
+    }
+    document.getElementById('scannerPage').classList.add('hidden');
+}
+
+function startScanner() {
+    if (typeof Html5Qrcode === 'undefined') {
+        document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--danger);">Libreria scanner non disponibile. Verifica la connessione internet.</p>';
+        return;
+    }
+
+    html5QrCode = new Html5Qrcode('reader');
+    
+    Html5Qrcode.getCameras().then(cameras => {
+        if (!cameras || cameras.length === 0) {
+            document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--danger);">Nessuna fotocamera trovata.</p>';
+            return;
+        }
+
+        // Prefer back camera
+        const camera = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+
+        html5QrCode.start(
+            camera.id,
+            { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
+            (decodedText) => {
+                handleQRScan(decodedText);
+            },
+            () => {} // ignore errors
+        ).then(() => {
+            scannerActive = true;
+        }).catch(err => {
+            document.getElementById('scannerResultContent').innerHTML = `<p style="color: var(--danger);">Errore fotocamera: ${err}</p>`;
+        });
+
+    }).catch(err => {
+        document.getElementById('scannerResultContent').innerHTML = `<p style="color: var(--danger);">Errore accesso fotocamera: ${err}</p>`;
+    });
+}
+
+function handleQRScan(qrText) {
+    // Parse format: MAGAZZINO:{modelId}|UNIT:{unitId}|SERIAL:{serial}
+    const parts = {};
+    qrText.split('|').forEach(part => {
+        const [key, val] = part.split(':');
+        if (key && val) parts[key.trim()] = val.trim();
+    });
+
+    const unitId = parts['UNIT'];
+    const unit = unitId ? appData.units.find(u => u.id === unitId) : null;
+    const model = unit ? appData.models.find(m => m.id === unit.modelId) : null;
+
+    if (!unit || !model) {
+        // Also try serial search as fallback
+        const serial = parts['SERIAL'];
+        const unitBySerial = serial ? appData.units.find(u => u.serialNumber === serial) : null;
+        if (unitBySerial) {
+            handleQRScan(`MAGAZZINO:${unitBySerial.modelId}|UNIT:${unitBySerial.id}|SERIAL:${unitBySerial.serialNumber}`);
+            return;
+        }
+        document.getElementById('scannerResultContent').innerHTML = `
+            <p style="color: var(--warning);">⚠️ Prodotto non riconosciuto.</p>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Dati letti: ${qrText}</p>
+        `;
+        return;
+    }
+
+    const isAvailable = unit.location === 'Magazzino';
+    const warehouse = appData.warehouses.find(w => w.id === model.warehouseId);
+
+    document.getElementById('scannerResultContent').innerHTML = `
+        <div class="scanner-unit-card">
+            <div class="scanner-unit-name">${model.name}</div>
+            <div class="scanner-unit-serial">S/N: ${unit.serialNumber} · ${warehouse ? warehouse.name : ''}</div>
+            <div style="margin-bottom: 0.75rem;">
+                <span class="status-badge ${isAvailable ? 'status-available' : 'status-rented'}">${unit.location}</span>
+                ${!isAvailable && unit.returnDate ? `<span style="color: var(--text-muted); font-size: 0.8rem; margin-left: 0.5rem;">Rientro: ${formatDate(unit.returnDate)}</span>` : ''}
+            </div>
+            <div class="scanner-actions">
+                ${isAvailable
+                    ? `<button class="btn btn-secondary" onclick="scannerRentUnit('${unit.id}')">📤 Registra Uscita</button>`
+                    : `<button class="btn btn-primary" onclick="scannerReturnUnit('${unit.id}')">📥 Registra Rientro</button>`
+                }
+                <button class="btn btn-secondary" onclick="closeScanner(); goToUnitFromGeneral('${unit.id}')">👁 Dettaglio</button>
+            </div>
+        </div>
+    `;
+}
+
+function scannerReturnUnit(unitId) {
+    returnUnit(unitId);
+    closeScanner();
+    showToast('Rientro registrato ✓');
+}
+
+function scannerRentUnit(unitId) {
+    // Stop scanner, show rent form in a small modal overlay
+    const unit = appData.units.find(u => u.id === unitId);
+    if (!unit) return;
+
+    document.getElementById('scannerResultContent').innerHTML = `
+        <div class="scanner-unit-card">
+            <div class="scanner-unit-name" style="margin-bottom: 0.75rem;">Registra Uscita</div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <input type="text" id="scannerDestination" placeholder="Destinazione..." style="padding: 0.6rem; background: #222; border: 1px solid #444; border-radius: 6px; color: white; font-size: 0.9rem; font-family: inherit;">
+                <input type="date" id="scannerReturnDate" style="padding: 0.6rem; background: #222; border: 1px solid #444; border-radius: 6px; color: white; font-size: 0.9rem; font-family: inherit;">
+            </div>
+            <div class="scanner-actions">
+                <button class="btn btn-primary" onclick="confirmScannerRent('${unitId}')">✓ Conferma</button>
+                <button class="btn btn-secondary" onclick="openScannerPage()">✕ Annulla</button>
+            </div>
+        </div>
+    `;
+}
+
+function confirmScannerRent(unitId) {
+    const destination = document.getElementById('scannerDestination').value.trim();
+    const returnDate = document.getElementById('scannerReturnDate').value;
+
+    if (!destination) { showToast('Inserisci destinazione', 'error'); return; }
+    if (!returnDate) { showToast('Inserisci data rientro', 'error'); return; }
+
+    const unit = appData.units.find(u => u.id === unitId);
+    unit.location = destination;
+    unit.returnDate = returnDate;
+    appData.movements.push({
+        id: generateId(),
+        unitId,
+        destination,
+        dateOut: new Date().toISOString().split('T')[0],
+        dateReturn: null
+    });
+
+    saveData();
+    closeScanner();
+    showToast('Uscita registrata ✓');
+}
+
+// =====================================================
+// MODAL FUNCTIONS
+// =====================================================
+function openModal(content) {
+    document.getElementById('modalContent').innerHTML = content;
+    document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('modalOverlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeModal();
+    });
+});
+
+// =====================================================
+// WAREHOUSE FUNCTIONS
+// =====================================================
+function selectWarehouse(warehouseId) {
+    currentView = { type: 'warehouseHome', warehouseId, categoryId: null, subcategoryId: null, modelId: null, unitId: null };
+    document.querySelectorAll('.warehouse-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.warehouse === warehouseId));
+    document.getElementById('warehouseTabs').style.display = 'flex';
+    document.getElementById('sidebar').style.display = 'flex';
+    document.getElementById('mainContainer').classList.remove('no-sidebar');
+    document.getElementById('globalSearch').disabled = false;
+    renderCategories();
+    updateDashboard();
+    const warehouse = appData.warehouses.find(w => w.id === warehouseId);
+    document.getElementById('mainContent').innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">📦</div>
+            <h3>${warehouse.name}</h3>
+            <p>Seleziona una categoria dal menu a sinistra per visualizzare i prodotti</p>
+        </div>
+    `;
+}
+
+function goToGeneralHome() {
+    currentView = { type: 'generalHome', warehouseId: null, categoryId: null, subcategoryId: null, modelId: null, unitId: null };
+    document.querySelectorAll('.warehouse-tab').forEach(tab => tab.classList.remove('active'));
+    document.getElementById('sidebar').style.display = 'none';
+    document.getElementById('mainContainer').classList.add('no-sidebar');
+    document.getElementById('globalSearch').disabled = true;
+    document.getElementById('globalSearch').value = '';
+    document.getElementById('warehouseTabs').style.display = 'flex';
+    document.getElementById('mainContent').innerHTML = `
+        <div class="general-home" id="generalHome">
+            <div class="home-cards-container">
+                <div class="dashboard-card home-card">
+                    <h3>Rientri prossimi 30 giorni</h3>
+                    <div class="dashboard-stat" id="generalReturnsCount">0</div>
+                    <div class="dashboard-label">prodotti in rientro (tutti i magazzini)</div>
+                    <div class="dashboard-list" id="generalReturnsList"></div>
+                </div>
+                <div class="dashboard-card home-card clickable" onclick="openJobsView()">
+                    <h3>Prossimi lavori</h3>
+                    <div class="dashboard-stat" id="jobsCount">0</div>
+                    <div class="dashboard-label">lavori in programma</div>
+                    <div class="click-hint">Clicca per gestire →</div>
+                </div>
+            </div>
+            <div class="home-content" id="homeContent">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📦</div>
+                    <h3>Seleziona un magazzino</h3>
+                    <p>Scegli un magazzino dalle tabs sopra per iniziare</p>
+                </div>
+            </div>
+        </div>
+    `;
+    updateGeneralDashboard();
+    updateJobsCount();
+}
+
+function updateGeneralDashboard() {
+    const upcomingReturns = appData.units.filter(u => isWithinDays(u.returnDate, 30));
+    const countEl = document.getElementById('generalReturnsCount');
+    const listEl = document.getElementById('generalReturnsList');
+    if (countEl) countEl.textContent = upcomingReturns.length;
+    if (listEl) {
+        const listHtml = upcomingReturns.sort((a, b) => new Date(a.returnDate) - new Date(b.returnDate)).slice(0, 10).map(unit => {
+            const model = appData.models.find(m => m.id === unit.modelId);
+            return `<div class="dashboard-list-item" onclick="goToUnitFromGeneral('${unit.id}')" style="cursor: pointer;"><span>${model ? model.name : ''} - ${unit.serialNumber}</span><span class="date">${formatDate(unit.returnDate)}</span></div>`;
+        }).join('');
+        listEl.innerHTML = listHtml || '<p style="color: var(--text-muted); font-size: 0.85rem;">Nessun rientro previsto</p>';
+    }
+}
+
+function goToUnitFromGeneral(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    if (unit) {
+        const model = appData.models.find(m => m.id === unit.modelId);
+        if (model) { selectWarehouse(model.warehouseId); setTimeout(() => renderUnitDetail(unitId), 100); }
+    }
+}
+
+// =====================================================
+// CATEGORY FUNCTIONS
+// =====================================================
+function getCategoriesForWarehouse(warehouseId) {
+    return appData.categories.filter(cat => cat.isDefault || cat.warehouseId === warehouseId);
+}
+
+function renderCategories() {
+    if (!currentView.warehouseId) return;
+    const categories = getCategoriesForWarehouse(currentView.warehouseId);
+    const list = document.getElementById('categoryList');
+    list.innerHTML = categories.map(cat => {
+        const hasSubcategories = cat.subcategories && cat.subcategories.length > 0;
+        return `
+            <li class="category-item" data-id="${cat.id}">
+                <button class="category-btn" onclick="toggleCategory('${cat.id}')">
+                    <span>${cat.name}</span>
+                    ${hasSubcategories ? '<span class="category-arrow">▶</span>' : ''}
+                </button>
+                ${hasSubcategories ? `<ul class="subcategory-list">${cat.subcategories.map(sub => `<li><button class="subcategory-btn" onclick="selectSubcategory('${cat.id}', '${sub.id}')">${sub.name}</button></li>`).join('')}</ul>` : ''}
+            </li>`;
+    }).join('');
+}
+
+function toggleCategory(categoryId) {
+    const category = appData.categories.find(c => c.id === categoryId);
+    const item = document.querySelector(`.category-item[data-id="${categoryId}"]`);
+    if (category.subcategories && category.subcategories.length > 0) {
+        item.classList.toggle('expanded');
+    } else {
+        selectCategory(categoryId);
+    }
+}
+
+function selectCategory(categoryId) {
+    document.querySelectorAll('.category-btn, .subcategory-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.category-item[data-id="${categoryId}"] .category-btn`).classList.add('active');
+    currentView = { ...currentView, type: 'category', categoryId, subcategoryId: null, modelId: null, unitId: null };
+    renderModels(categoryId, null);
+}
+
+function selectSubcategory(categoryId, subcategoryId) {
+    document.querySelectorAll('.category-btn, .subcategory-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    currentView = { ...currentView, type: 'subcategory', categoryId, subcategoryId, modelId: null, unitId: null };
+    renderModels(categoryId, subcategoryId);
+}
+
+// =====================================================
+// MODELS FUNCTIONS
+// =====================================================
+function getModels(categoryId, subcategoryId) {
+    return appData.models.filter(m =>
+        m.warehouseId === currentView.warehouseId &&
+        m.categoryId === categoryId &&
+        (subcategoryId ? m.subcategoryId === subcategoryId : !m.subcategoryId || m.subcategoryId === null)
+    );
+}
+
+function renderModels(categoryId, subcategoryId) {
+    const category = appData.categories.find(c => c.id === categoryId);
+    const subcategory = subcategoryId ? category.subcategories.find(s => s.id === subcategoryId) : null;
+    const models = getModels(categoryId, subcategoryId);
+    const isCable = category.isCable;
+    let breadcrumb = category.name;
+    if (subcategory) breadcrumb += ` / <span>${subcategory.name}</span>`;
+
+    let content = `
+        <div class="content-header">
+            <div>
+                <h1 class="content-title">${subcategory ? subcategory.name : category.name}</h1>
+                <div class="breadcrumb">${breadcrumb}</div>
+            </div>
+            <button class="btn btn-primary" onclick="openAddModelModal('${categoryId}', ${subcategoryId ? `'${subcategoryId}'` : 'null'}, ${isCable})">+ Aggiungi Modello</button>
+        </div>
+    `;
+
+    if (models.length === 0) {
+        content += `<div class="empty-state"><div class="empty-state-icon">📦</div><h3>Nessun modello</h3><p>Aggiungi il primo modello a questa categoria</p></div>`;
+    } else {
+        content += `<div class="table-container"><table class="table"><thead><tr><th>Modello</th><th>Qtà Totale</th><th>In Magazzino</th><th>Azioni</th></tr></thead><tbody>`;
+        models.forEach(model => {
+            let totalQty, availableQty;
+            if (isCable) {
+                totalQty = model.totalQty || 0;
+                availableQty = model.availableQty || 0;
+            } else {
+                const units = appData.units.filter(u => u.modelId === model.id);
+                totalQty = units.length;
+                availableQty = units.filter(u => u.location === 'Magazzino').length;
+            }
+            content += `
+                <tr class="${isCable ? '' : 'table-clickable'}" ${isCable ? '' : `onclick="renderUnits('${model.id}')"`}>
+                    <td><strong>${model.name}</strong></td>
+                    <td><span class="qty-badge qty-total">${totalQty}</span></td>
+                    <td><span class="qty-badge ${availableQty === 0 ? 'qty-warning' : 'qty-available'}">${availableQty}</span></td>
+                    <td>
+                        <div class="actions-cell" onclick="event.stopPropagation()">
+                            ${isCable ? `
+                                <button class="btn btn-sm btn-secondary" onclick="openCableMovementModal('${model.id}', 'out')">- Uscita</button>
+                                <button class="btn btn-sm btn-primary" onclick="openCableMovementModal('${model.id}', 'in')">+ Entrata</button>
+                            ` : `<button class="btn btn-sm btn-secondary" onclick="openAddUnitModal('${model.id}')">+ Unità</button>`}
+                            <button class="btn btn-sm btn-secondary" onclick="openEditModelModal('${model.id}')">✎</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteModel('${model.id}')">✗</button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+        content += `</tbody></table></div>`;
+    }
+    document.getElementById('mainContent').innerHTML = content;
+}
+
+// =====================================================
+// UNITS FUNCTIONS
+// =====================================================
+function renderUnits(modelId) {
+    const model = appData.models.find(m => m.id === modelId);
+    const category = appData.categories.find(c => c.id === model.categoryId);
+    const subcategory = model.subcategoryId ? category.subcategories.find(s => s.id === model.subcategoryId) : null;
+    const units = appData.units.filter(u => u.modelId === modelId);
+    currentView = { ...currentView, type: 'units', modelId };
+
+    let breadcrumb = category.name;
+    if (subcategory) breadcrumb += ` / ${subcategory.name}`;
+    breadcrumb += ` / <span>${model.name}</span>`;
+
+    let content = `
+        <div class="content-header">
+            <div>
+                <h1 class="content-title">${model.name}</h1>
+                <div class="breadcrumb">${breadcrumb}</div>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-secondary" onclick="goBack()">← Indietro</button>
+                <button class="btn btn-primary" onclick="openAddUnitModal('${modelId}')">+ Aggiungi Unità</button>
+            </div>
+        </div>
+    `;
+
+    if (units.length === 0) {
+        content += `<div class="empty-state"><div class="empty-state-icon">🔧</div><h3>Nessuna unità</h3><p>Aggiungi la prima unità per questo modello</p></div>`;
+    } else {
+        content += `<div class="table-container"><table class="table"><thead><tr><th>N° Serie</th><th>Posizione</th><th>Data Rientro</th><th>Azioni</th></tr></thead><tbody>`;
+        units.forEach(unit => {
+            const isAvailable = unit.location === 'Magazzino';
+            content += `
+                <tr class="table-clickable" onclick="renderUnitDetail('${unit.id}')">
+                    <td><strong>${unit.serialNumber}</strong></td>
+                    <td><span class="status-badge ${isAvailable ? 'status-available' : 'status-rented'}">${unit.location}</span></td>
+                    <td>${isAvailable ? '-' : formatDate(unit.returnDate)}</td>
+                    <td>
+                        <div class="actions-cell" onclick="event.stopPropagation()">
+                            ${isAvailable
+                                ? `<button class="btn btn-sm btn-secondary" onclick="openRentModal('${unit.id}')">📤 Uscita</button>`
+                                : `<button class="btn btn-sm btn-primary" onclick="returnUnit('${unit.id}')">📥 Rientro</button>`
+                            }
+                            <button class="btn btn-sm btn-warning" onclick="generateQRCode('${unit.id}')">🔲 QR</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUnit('${unit.id}')">✗</button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+        content += `</tbody></table></div>`;
+    }
+    document.getElementById('mainContent').innerHTML = content;
+}
+
+function renderUnitDetail(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    const model = appData.models.find(m => m.id === unit.modelId);
+    const category = appData.categories.find(c => c.id === model.categoryId);
+    const movements = appData.movements.filter(m => m.unitId === unitId).sort((a, b) => new Date(b.dateOut) - new Date(a.dateOut));
+    currentView = { ...currentView, type: 'unitDetail', unitId };
+    const isAvailable = unit.location === 'Magazzino';
+
+    const content = `
+        <div class="content-header">
+            <div>
+                <h1 class="content-title">Dettaglio Unità</h1>
+                <div class="breadcrumb">${category.name} / ${model.name} / <span>${unit.serialNumber}</span></div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary" onclick="renderUnits('${model.id}')">← Indietro</button>
+                <button class="btn btn-warning" onclick="generateQRCode('${unit.id}')">🔲 Genera QR</button>
+                ${isAvailable
+                    ? `<button class="btn btn-primary" onclick="openRentModal('${unit.id}')">📤 Registra Uscita</button>`
+                    : `<button class="btn btn-primary" onclick="returnUnit('${unit.id}')">📥 Registra Rientro</button>`
+                }
+            </div>
+        </div>
+
+        <div class="unit-detail">
+            <div class="unit-detail-header">
+                <div class="unit-detail-info">
+                    <h2>
+                        <span class="status-badge ${isAvailable ? 'status-available' : 'status-rented'}">${unit.location}</span>
+                        ${unit.serialNumber}
+                    </h2>
+                    <div class="unit-detail-meta">${model.name}</div>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="openEditUnitModal('${unit.id}')">✎ Modifica</button>
+            </div>
+            <div class="unit-detail-body">
+                <div class="detail-grid">
+                    <div class="detail-item"><div class="detail-item-label">Numero di Serie</div><div class="detail-item-value">${unit.serialNumber}</div></div>
+                    <div class="detail-item"><div class="detail-item-label">Posizione Attuale</div><div class="detail-item-value">${unit.location}</div></div>
+                    <div class="detail-item"><div class="detail-item-label">Data Rientro Prevista</div><div class="detail-item-value">${isAvailable ? '-' : formatDate(unit.returnDate)}</div></div>
+                    <div class="detail-item"><div class="detail-item-label">Data di Acquisto</div><div class="detail-item-value">${unit.purchaseDate ? formatDate(unit.purchaseDate) : '-'}</div></div>
+                    <div class="detail-item"><div class="detail-item-label">Azienda (fornitore)</div><div class="detail-item-value">${unit.company || '-'}</div></div>
+                    <div class="detail-item"><div class="detail-item-label">Note</div><div class="detail-item-value">${unit.notes || '-'}</div></div>
+                </div>
+
+                <div class="history-section">
+                    <h3>📋 Storico Movimenti</h3>
+                    ${movements.length === 0
+                        ? '<p style="color: var(--text-muted);">Nessun movimento registrato</p>'
+                        : `<div class="history-timeline">${movements.map(mov => `
+                            <div class="history-item">
+                                <div class="history-item-header">
+                                    <span class="history-item-location">${mov.destination}</span>
+                                    <span class="history-item-date">${formatDate(mov.dateOut)}${mov.dateReturn ? ` → ${formatDate(mov.dateReturn)}` : ' (in corso)'}</span>
+                                </div>
+                            </div>`).join('')}
+                        </div>`
+                    }
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('mainContent').innerHTML = content;
+}
+
+// =====================================================
+// MODAL FORMS
+// =====================================================
+function openAddModelModal(categoryId, subcategoryId, isCable) {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Aggiungi Modello</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Nome Modello</label><input type="text" class="form-input" id="modelName" placeholder="Es. Epson EB-L1070"></div>
+            ${isCable ? `<div class="form-group"><label class="form-label">Quantità Totale</label><input type="number" class="form-input" id="modelQty" value="0" min="0"></div><div class="form-group"><label class="form-label">Quantità in Magazzino</label><input type="number" class="form-input" id="modelAvailQty" value="0" min="0"></div>` : ''}
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="addModel('${categoryId}', ${subcategoryId ? `'${subcategoryId}'` : 'null'}, ${isCable})">Aggiungi</button>
+        </div>
+    `);
+}
+
+function addModel(categoryId, subcategoryId, isCable) {
+    const name = document.getElementById('modelName').value.trim();
+    if (!name) { showToast('Inserisci il nome del modello', 'error'); return; }
+    const model = { id: generateId(), name, categoryId, subcategoryId: subcategoryId || null, warehouseId: currentView.warehouseId };
+    if (isCable) {
+        model.totalQty = parseInt(document.getElementById('modelQty').value) || 0;
+        model.availableQty = parseInt(document.getElementById('modelAvailQty').value) || 0;
+    }
+    appData.models.push(model);
+    saveData(); closeModal(); renderModels(categoryId, subcategoryId);
+    showToast('Modello aggiunto con successo');
+}
+
+function openEditModelModal(modelId) {
+    const model = appData.models.find(m => m.id === modelId);
+    const category = appData.categories.find(c => c.id === model.categoryId);
+    const isCable = category.isCable;
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Modifica Modello</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Nome Modello</label><input type="text" class="form-input" id="modelName" value="${model.name}"></div>
+            ${isCable ? `<div class="form-group"><label class="form-label">Quantità Totale</label><input type="number" class="form-input" id="modelQty" value="${model.totalQty || 0}" min="0"></div><div class="form-group"><label class="form-label">Quantità in Magazzino</label><input type="number" class="form-input" id="modelAvailQty" value="${model.availableQty || 0}" min="0"></div>` : ''}
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="updateModel('${modelId}', ${isCable})">Salva</button>
+        </div>
+    `);
+}
+
+function updateModel(modelId, isCable) {
+    const model = appData.models.find(m => m.id === modelId);
+    model.name = document.getElementById('modelName').value.trim();
+    if (isCable) {
+        model.totalQty = parseInt(document.getElementById('modelQty').value) || 0;
+        model.availableQty = parseInt(document.getElementById('modelAvailQty').value) || 0;
+    }
+    saveData(); closeModal(); renderModels(model.categoryId, model.subcategoryId);
+    showToast('Modello aggiornato');
+}
+
+function deleteModel(modelId) {
+    if (!confirm('Sei sicuro di voler eliminare questo modello e tutte le sue unità?')) return;
+    const model = appData.models.find(m => m.id === modelId);
+    appData.models = appData.models.filter(m => m.id !== modelId);
+    appData.units = appData.units.filter(u => u.modelId !== modelId);
+    appData.movements = appData.movements.filter(m => { const unit = appData.units.find(u => u.id === m.unitId); return unit !== undefined; });
+    saveData(); renderModels(model.categoryId, model.subcategoryId);
+    showToast('Modello eliminato');
+}
+
+function openAddUnitModal(modelId) {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Aggiungi Unità</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Numero di Serie</label><input type="text" class="form-input" id="unitSerial" placeholder="Es. SN-001"></div>
+            <div class="form-group"><label class="form-label">Data di Acquisto</label><input type="date" class="form-input" id="unitPurchaseDate"></div>
+            <div class="form-group"><label class="form-label">Azienda (fornitore)</label><input type="text" class="form-input" id="unitCompany" placeholder="Es. TechStore Srl"></div>
+            <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="unitNotes" placeholder="Note aggiuntive..."></textarea></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="addUnit('${modelId}')">Aggiungi</button>
+        </div>
+    `);
+}
+
+function addUnit(modelId) {
+    const serialNumber = document.getElementById('unitSerial').value.trim();
+    if (!serialNumber) { showToast('Inserisci il numero di serie', 'error'); return; }
+    const unit = {
+        id: generateId(), modelId, serialNumber,
+        location: 'Magazzino', returnDate: null,
+        purchaseDate: document.getElementById('unitPurchaseDate').value || null,
+        company: document.getElementById('unitCompany').value.trim() || null,
+        notes: document.getElementById('unitNotes').value.trim()
+    };
+    appData.units.push(unit);
+    saveData(); closeModal(); renderUnits(modelId);
+    showToast('Unità aggiunta con successo');
+}
+
+function openEditUnitModal(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Modifica Unità</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Numero di Serie</label><input type="text" class="form-input" id="unitSerial" value="${unit.serialNumber}"></div>
+            <div class="form-group"><label class="form-label">Data di Acquisto</label><input type="date" class="form-input" id="unitPurchaseDate" value="${unit.purchaseDate || ''}"></div>
+            <div class="form-group"><label class="form-label">Azienda (fornitore)</label><input type="text" class="form-input" id="unitCompany" value="${unit.company || ''}" placeholder="Es. TechStore Srl"></div>
+            <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="unitNotes">${unit.notes || ''}</textarea></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="updateUnit('${unitId}')">Salva</button>
+        </div>
+    `);
+}
+
+function updateUnit(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    unit.serialNumber = document.getElementById('unitSerial').value.trim();
+    unit.purchaseDate = document.getElementById('unitPurchaseDate').value || null;
+    unit.company = document.getElementById('unitCompany').value.trim() || null;
+    unit.notes = document.getElementById('unitNotes').value.trim();
+    saveData(); closeModal(); renderUnitDetail(unitId);
+    showToast('Unità aggiornata');
+}
+
+function deleteUnit(unitId) {
+    if (!confirm('Sei sicuro di voler eliminare questa unità?')) return;
+    const unit = appData.units.find(u => u.id === unitId);
+    const modelId = unit.modelId;
+    appData.units = appData.units.filter(u => u.id !== unitId);
+    appData.movements = appData.movements.filter(m => m.unitId !== unitId);
+    saveData(); renderUnits(modelId);
+    showToast('Unità eliminata');
+}
+
+function openRentModal(unitId) {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Registra Uscita</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Destinazione</label><input type="text" class="form-input" id="rentDestination" placeholder="Es. Milano, Roma..."></div>
+            <div class="form-group"><label class="form-label">Data Rientro Prevista</label><input type="date" class="form-input" id="rentReturnDate"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="rentUnit('${unitId}')">Conferma Uscita</button>
+        </div>
+    `);
+}
+
+function rentUnit(unitId) {
+    const destination = document.getElementById('rentDestination').value.trim();
+    const returnDate = document.getElementById('rentReturnDate').value;
+    if (!destination) { showToast('Inserisci la destinazione', 'error'); return; }
+    if (!returnDate) { showToast('Inserisci la data di rientro', 'error'); return; }
+    const unit = appData.units.find(u => u.id === unitId);
+    unit.location = destination;
+    unit.returnDate = returnDate;
+    appData.movements.push({ id: generateId(), unitId, destination, dateOut: new Date().toISOString().split('T')[0], dateReturn: null });
+    saveData(); closeModal(); updateDashboard();
+    if (currentView.type === 'unitDetail') renderUnitDetail(unitId);
+    else renderUnits(unit.modelId);
+    showToast('Uscita registrata');
+}
+
+function returnUnit(unitId) {
+    const unit = appData.units.find(u => u.id === unitId);
+    const activeMovement = appData.movements.find(m => m.unitId === unitId && !m.dateReturn);
+    if (activeMovement) activeMovement.dateReturn = new Date().toISOString().split('T')[0];
+    unit.location = 'Magazzino';
+    unit.returnDate = null;
+    saveData(); updateDashboard();
+    if (currentView.type === 'unitDetail') renderUnitDetail(unitId);
+    else renderUnits(unit.modelId);
+    showToast('Rientro registrato');
+}
+
+function openCableMovementModal(modelId, type) {
+    const model = appData.models.find(m => m.id === modelId);
+    const maxQty = type === 'out' ? model.availableQty : 999;
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">${type === 'out' ? 'Uscita' : 'Entrata'} Cavi</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Quantità</label><input type="number" class="form-input" id="cableQty" value="1" min="1" ${type === 'out' ? `max="${maxQty}"` : ''}></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="moveCables('${modelId}', '${type}')">Conferma</button>
+        </div>
+    `);
+}
+
+function moveCables(modelId, type) {
+    const qty = parseInt(document.getElementById('cableQty').value) || 0;
+    const model = appData.models.find(m => m.id === modelId);
+    if (type === 'out') {
+        if (qty > model.availableQty) { showToast('Quantità non disponibile', 'error'); return; }
+        model.availableQty -= qty;
+    } else {
+        model.availableQty += qty;
+        if (model.availableQty > model.totalQty) model.totalQty = model.availableQty;
+    }
+    saveData(); closeModal(); renderModels(model.categoryId, model.subcategoryId);
+    showToast(`${type === 'out' ? 'Uscita' : 'Entrata'} registrata`);
+}
+
+// =====================================================
+// DASHBOARD
+// =====================================================
+function updateDashboard() {
+    if (!currentView.warehouseId) return;
+    const warehouseModelIds = appData.models.filter(m => m.warehouseId === currentView.warehouseId).map(m => m.id);
+    const upcomingReturns = appData.units.filter(u => warehouseModelIds.includes(u.modelId) && isWithinDays(u.returnDate, 30));
+    const countEl = document.getElementById('returnsCount');
+    if (countEl) countEl.textContent = upcomingReturns.length;
+    const listEl = document.getElementById('returnsList');
+    if (listEl) {
+        listEl.innerHTML = upcomingReturns.sort((a, b) => new Date(a.returnDate) - new Date(b.returnDate)).slice(0, 10).map(unit => {
+            const model = appData.models.find(m => m.id === unit.modelId);
+            return `<div class="dashboard-list-item" onclick="renderUnitDetail('${unit.id}')" style="cursor: pointer;"><span>${model ? model.name : ''} - ${unit.serialNumber}</span><span class="date">${formatDate(unit.returnDate)}</span></div>`;
+        }).join('') || '<p style="color: var(--text-muted); font-size: 0.85rem;">Nessun rientro previsto</p>';
+    }
+}
+
+// =====================================================
+// SEARCH
+// =====================================================
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('globalSearch').addEventListener('input', function(e) {
+        if (!currentView.warehouseId) return;
+        const query = e.target.value.toLowerCase().trim();
+        if (query.length < 2) {
+            if (currentView.type === 'search') {
+                const warehouse = appData.warehouses.find(w => w.id === currentView.warehouseId);
+                document.getElementById('mainContent').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><h3>${warehouse.name}</h3><p>Seleziona una categoria dal menu a sinistra</p></div>`;
+            }
+            return;
+        }
+        currentView = { ...currentView, type: 'search' };
+        const warehouseModels = appData.models.filter(m => m.warehouseId === currentView.warehouseId);
+        const warehouseModelIds = warehouseModels.map(m => m.id);
+        const modelResults = warehouseModels.filter(m => m.name.toLowerCase().includes(query)).map(m => {
+            const cat = appData.categories.find(c => c.id === m.categoryId);
+            return { type: 'model', id: m.id, title: m.name, meta: cat ? cat.name : '', categoryId: m.categoryId, subcategoryId: m.subcategoryId, isCable: cat ? cat.isCable : false };
+        });
+        const unitResults = appData.units.filter(u => warehouseModelIds.includes(u.modelId) && u.serialNumber.toLowerCase().includes(query)).map(u => {
+            const model = appData.models.find(m => m.id === u.modelId);
+            const cat = model ? appData.categories.find(c => c.id === model.categoryId) : null;
+            return { type: 'unit', id: u.id, title: u.serialNumber, meta: model ? `${cat ? cat.name + ' / ' : ''}${model.name}` : '', location: u.location };
+        });
+        const allResults = [...modelResults, ...unitResults];
+        let content = `<div class="content-header"><div><h1 class="content-title">Risultati ricerca</h1><div class="breadcrumb">${allResults.length} risultati per "<span>${query}</span>"</div></div></div><div class="search-results">`;
+        if (allResults.length === 0) {
+            content += `<div class="empty-state"><div class="empty-state-icon">🔍</div><h3>Nessun risultato</h3><p>Prova con termini diversi</p></div>`;
+        } else {
+            allResults.forEach(result => {
+                content += `<div class="search-result-item" onclick="${result.type === 'model' ? (result.isCable ? `renderModels('${result.categoryId}', ${result.subcategoryId ? `'${result.subcategoryId}'` : 'null'})` : `renderUnits('${result.id}')`) : `renderUnitDetail('${result.id}')`}"><div class="search-result-title">${result.title}</div><div class="search-result-meta">${result.meta}${result.location ? ` • ${result.location}` : ''}</div></div>`;
+            });
+        }
+        content += '</div>';
+        document.getElementById('mainContent').innerHTML = content;
+    });
+});
+
+// =====================================================
+// SETTINGS / CATEGORIES
+// =====================================================
+function openSettingsModal() {
+    const warehouseInfo = currentView.warehouseId ? ` (${appData.warehouses.find(w => w.id === currentView.warehouseId)?.name || ''})` : ' (Globale)';
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Gestione Categorie${warehouseInfo}</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            ${currentView.warehouseId ? `<div style="margin-bottom: 1rem;"><button class="btn btn-primary" onclick="openAddCategoryModal()">+ Nuova Categoria</button></div>` : '<p style="margin-bottom: 1rem; color: var(--text-secondary);">Seleziona un magazzino per aggiungere categorie personalizzate</p>'}
+            <div class="table-container">
+                <table class="table">
+                    <thead><tr><th>Categoria</th><th>Sottocategorie</th><th>Tipo</th><th>Visibilità</th><th>Azioni</th></tr></thead>
+                    <tbody>
+                        ${appData.categories.map(cat => `
+                            <tr>
+                                <td><strong>${cat.name}</strong></td>
+                                <td>${cat.subcategories.map(s => s.name).join(', ') || '-'}</td>
+                                <td>${cat.isCable ? 'Solo quantità' : 'Con N° Serie'}</td>
+                                <td>${cat.isDefault ? 'Tutti i magazzini' : (appData.warehouses.find(w => w.id === cat.warehouseId)?.name || '-')}</td>
+                                <td><div class="actions-cell">
+                                    ${!cat.isDefault ? `<button class="btn btn-sm btn-secondary" onclick="openEditCategoryModal('${cat.id}')">✎</button><button class="btn btn-sm btn-danger" onclick="deleteCategory('${cat.id}')">✗</button>` : '<span style="color: var(--text-muted); font-size: 0.8rem;">Default</span>'}
+                                </div></td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `);
+}
+
+function openAddCategoryModal() {
+    if (!currentView.warehouseId) { showToast('Seleziona prima un magazzino', 'error'); return; }
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Nuova Categoria</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Nome Categoria</label><input type="text" class="form-input" id="catName" placeholder="Es. Luci"></div>
+            <div class="form-group"><label class="form-label">Sottocategorie (separate da virgola, opzionale)</label><input type="text" class="form-input" id="catSubs" placeholder="Es. LED, Alogene, Strobo"></div>
+            <div class="form-group"><label class="form-label"><input type="checkbox" id="catIsCable"> Solo quantità (senza numeri di serie)</label></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="addCategory()">Aggiungi</button>
+        </div>
+    `);
+}
+
+function addCategory() {
+    const name = document.getElementById('catName').value.trim();
+    if (!name) { showToast('Inserisci il nome della categoria', 'error'); return; }
+    const subsText = document.getElementById('catSubs').value.trim();
+    const subcategories = subsText ? subsText.split(',').map(s => ({ id: s.trim().toLowerCase().replace(/\s+/g, '-'), name: s.trim() })) : [];
+    const category = { id: generateId(), name, subcategories, isCable: document.getElementById('catIsCable').checked, isDefault: false, warehouseId: currentView.warehouseId };
+    appData.categories.push(category);
+    saveData(); closeModal(); renderCategories();
+    showToast('Categoria aggiunta');
+}
+
+function openEditCategoryModal(categoryId) {
+    const cat = appData.categories.find(c => c.id === categoryId);
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Modifica Categoria</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Nome Categoria</label><input type="text" class="form-input" id="catName" value="${cat.name}"></div>
+            <div class="form-group"><label class="form-label">Sottocategorie (separate da virgola)</label><input type="text" class="form-input" id="catSubs" value="${cat.subcategories.map(s => s.name).join(', ')}"></div>
+            <div class="form-group"><label class="form-label"><input type="checkbox" id="catIsCable" ${cat.isCable ? 'checked' : ''}> Solo quantità (senza numeri di serie)</label></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="updateCategory('${categoryId}')">Salva</button>
+        </div>
+    `);
+}
+
+function updateCategory(categoryId) {
+    const cat = appData.categories.find(c => c.id === categoryId);
+    cat.name = document.getElementById('catName').value.trim();
+    const subsText = document.getElementById('catSubs').value.trim();
+    cat.subcategories = subsText ? subsText.split(',').map(s => ({ id: s.trim().toLowerCase().replace(/\s+/g, '-'), name: s.trim() })) : [];
+    cat.isCable = document.getElementById('catIsCable').checked;
+    saveData(); closeModal(); renderCategories();
+    showToast('Categoria aggiornata');
+}
+
+function deleteCategory(categoryId) {
+    if (!confirm('Sei sicuro di voler eliminare questa categoria e tutti i suoi prodotti?')) return;
+    appData.categories = appData.categories.filter(c => c.id !== categoryId);
+    appData.models = appData.models.filter(m => m.categoryId !== categoryId);
+    const modelIds = appData.models.map(m => m.id);
+    appData.units = appData.units.filter(u => modelIds.includes(u.modelId));
+    const unitIds = appData.units.map(u => u.id);
+    appData.movements = appData.movements.filter(m => unitIds.includes(m.unitId));
+    saveData(); renderCategories(); openSettingsModal();
+    showToast('Categoria eliminata');
+}
+
+// =====================================================
+// JOBS FUNCTIONS
+// =====================================================
+let showCompletedJobs = false;
+
+function updateJobsCount() {
+    const pendingJobs = appData.jobs ? appData.jobs.filter(j => !j.completed).length : 0;
+    const countEl = document.getElementById('jobsCount');
+    if (countEl) countEl.textContent = pendingJobs;
+}
+
+function openJobsView() {
+    currentView = { type: 'jobs' };
+    document.getElementById('warehouseTabs').style.display = 'none';
+    document.getElementById('sidebar').style.display = 'none';
+    document.getElementById('mainContainer').classList.add('no-sidebar');
+    renderJobsView();
+}
+
+function renderJobsView() {
+    const jobs = appData.jobs || [];
+    const filteredJobs = showCompletedJobs ? jobs : jobs.filter(j => !j.completed);
+    const sortedJobs = filteredJobs.sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return new Date(a.date) - new Date(b.date);
+    });
+
+    let content = `
+        <div class="jobs-container">
+            <div class="content-header">
+                <div>
+                    <h1 class="content-title">Gestione Lavori</h1>
+                    <div class="breadcrumb">Pianifica e organizza i tuoi lavori</div>
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button class="btn btn-secondary" onclick="goToGeneralHome()">← Torna alla Home</button>
+                    <button class="btn btn-primary" onclick="openAddJobModal()">+ Nuovo Lavoro</button>
+                </div>
+            </div>
+            <div class="show-completed-toggle">
+                <input type="checkbox" id="showCompleted" ${showCompletedJobs ? 'checked' : ''} onchange="toggleShowCompleted()">
+                <label for="showCompleted">Mostra lavori completati</label>
+            </div>
+    `;
+
+    if (sortedJobs.length === 0) {
+        content += `<div class="empty-state"><div class="empty-state-icon">📋</div><h3>Nessun lavoro</h3><p>${showCompletedJobs ? 'Non ci sono lavori registrati' : 'Non ci sono lavori in programma'}</p></div>`;
+    } else {
+        sortedJobs.forEach(job => {
+            const jobDate = new Date(job.date);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const isPast = jobDate < today && !job.completed;
+
+            content += `
+                <div class="job-card ${job.completed ? 'completed' : ''}">
+                    <div class="job-header">
+                        <div>
+                            <div class="job-title">${job.name}</div>
+                            <div class="job-date ${isPast ? 'past' : ''}">${formatDate(job.date)}${isPast ? ' - IN RITARDO' : ''}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span class="job-status-badge ${job.completed ? 'completed' : 'pending'}">${job.completed ? 'Completato' : 'In programma'}</span>
+                            <div class="actions-cell">
+                                ${!job.completed ? `<button class="btn btn-sm btn-primary" onclick="toggleJobComplete('${job.id}')">✓ Completa</button>` : `<button class="btn btn-sm btn-secondary" onclick="toggleJobComplete('${job.id}')">↩ Riapri</button>`}
+                                <button class="btn btn-sm btn-secondary" onclick="openEditJobModal('${job.id}')">✎</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteJob('${job.id}')">✗</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="job-body">
+                        ${job.notes ? `<div class="job-section"><div class="job-section-title">Note</div><div class="job-notes">${job.notes.replace(/\n/g, '<br>')}</div></div>` : ''}
+                        ${(job.materials && job.materials.length > 0) ? `
+                            <div class="job-section">
+                                <div class="job-section-title">Materiale dal magazzino</div>
+                                <div class="material-list">
+                                    ${job.materials.map(mat => {
+                                        const model = appData.models.find(m => m.id === mat.modelId);
+                                        return `<div class="material-item"><span class="material-name">${model ? model.name : 'N/D'}</span><span class="material-qty">×${mat.quantity}</span></div>`;
+                                    }).join('')}
+                                </div>
+                            </div>` : ''}
+                        ${(job.externalMaterials && job.externalMaterials.length > 0) ? `
+                            <div class="job-section">
+                                <div class="job-section-title">Materiale esterno</div>
+                                <div class="material-list">
+                                    ${job.externalMaterials.map(mat => `
+                                        <div class="material-item external">
+                                            <div><span class="material-name">${mat.name}</span>${mat.supplier ? `<div class="material-details">${mat.supplier}</div>` : ''}</div>
+                                            <span class="material-qty">×${mat.quantity}${mat.price ? ` · €${mat.price}` : ''}</span>
+                                        </div>`).join('')}
+                                </div>
+                            </div>` : ''}
+                    </div>
+                </div>`;
+        });
+    }
+
+    content += '</div>';
+    document.getElementById('mainContent').innerHTML = content;
+}
+
+function toggleShowCompleted() {
+    showCompletedJobs = document.getElementById('showCompleted').checked;
+    renderJobsView();
+}
+
+function toggleJobComplete(jobId) {
+    const job = appData.jobs.find(j => j.id === jobId);
+    if (job) { job.completed = !job.completed; saveData(); renderJobsView(); showToast(job.completed ? 'Lavoro completato' : 'Lavoro riaperto'); }
+}
+
+function deleteJob(jobId) {
+    if (!confirm('Sei sicuro di voler eliminare questo lavoro?')) return;
+    appData.jobs = appData.jobs.filter(j => j.id !== jobId);
+    saveData(); renderJobsView();
+    showToast('Lavoro eliminato');
+}
+
+function openAddJobModal() {
+    const modelsByWarehouse = {};
+    appData.warehouses.forEach(w => { modelsByWarehouse[w.id] = { name: w.name, models: appData.models.filter(m => m.warehouseId === w.id) }; });
+    let materialSelectorHtml = '';
+    appData.warehouses.forEach(w => {
+        const models = modelsByWarehouse[w.id].models;
+        if (models.length > 0) {
+            materialSelectorHtml += `<div style="padding: 0.5rem 1rem; background: var(--bg-tertiary); font-weight: 600; font-size: 0.85rem;">${w.name}</div>`;
+            models.forEach(model => {
+                const category = appData.categories.find(c => c.id === model.categoryId);
+                materialSelectorHtml += `<div class="material-selector-item"><div><div style="font-weight: 500;">${model.name}</div><div style="font-size: 0.8rem; color: var(--text-muted);">${category ? category.name : ''}</div></div><input type="number" min="0" value="0" data-model-id="${model.id}" class="model-qty-input"></div>`;
+            });
+        }
+    });
+    if (!materialSelectorHtml) materialSelectorHtml = '<p style="padding: 1rem; color: var(--text-muted);">Nessun modello disponibile.</p>';
+
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Nuovo Lavoro</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div class="form-group"><label class="form-label">Nome Lavoro *</label><input type="text" class="form-input" id="jobName" placeholder="Es. Evento Milano"></div>
+            <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-input" id="jobDate"></div>
+            <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="jobNotes" placeholder="Note aggiuntive..."></textarea></div>
+            <div class="form-group"><label class="form-label">Materiale dal magazzino</label><div class="material-selector">${materialSelectorHtml}</div></div>
+            <div class="form-group"><label class="form-label">Materiale da acquistare/noleggiare</label><div id="externalMaterialsList" class="external-materials-list"></div><button type="button" class="add-external-btn" onclick="addExternalMaterialRow()">+ Aggiungi materiale esterno</button></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="addJob()">Crea Lavoro</button>
+        </div>
+    `);
+}
+
+function addExternalMaterialRow() {
+    const list = document.getElementById('externalMaterialsList');
+    const row = document.createElement('div');
+    row.className = 'external-material-row';
+    row.innerHTML = `<input type="text" placeholder="Nome" class="ext-name"><input type="number" min="1" value="1" placeholder="Qtà" class="ext-qty"><input type="text" placeholder="Fornitore" class="ext-supplier"><input type="number" min="0" step="0.01" placeholder="Prezzo €" class="ext-price"><button type="button" onclick="this.parentElement.remove()">✗</button>`;
+    list.appendChild(row);
+}
+
+function collectExternalMaterials() {
+    const rows = document.querySelectorAll('.external-material-row');
+    const materials = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.ext-name').value.trim();
+        const quantity = parseInt(row.querySelector('.ext-qty').value) || 1;
+        const supplier = row.querySelector('.ext-supplier').value.trim();
+        const price = row.querySelector('.ext-price').value;
+        if (name) materials.push({ name, quantity, supplier: supplier || null, price: price ? parseFloat(price) : null });
+    });
+    return materials;
+}
+
+function addJob() {
+    const name = document.getElementById('jobName').value.trim();
+    const date = document.getElementById('jobDate').value;
+    const notes = document.getElementById('jobNotes').value.trim();
+    if (!name) { showToast('Inserisci il nome del lavoro', 'error'); return; }
+    if (!date) { showToast('Inserisci la data', 'error'); return; }
+    const materials = [];
+    document.querySelectorAll('.model-qty-input').forEach(input => {
+        const qty = parseInt(input.value) || 0;
+        if (qty > 0) materials.push({ modelId: input.dataset.modelId, quantity: qty });
+    });
+    const job = { id: generateId(), name, date, notes, materials, externalMaterials: collectExternalMaterials(), completed: false };
+    if (!appData.jobs) appData.jobs = [];
+    appData.jobs.push(job);
+    saveData(); closeModal(); renderJobsView();
+    showToast('Lavoro creato con successo');
+}
+
+function openEditJobModal(jobId) {
+    const job = appData.jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const modelsByWarehouse = {};
+    appData.warehouses.forEach(w => { modelsByWarehouse[w.id] = { name: w.name, models: appData.models.filter(m => m.warehouseId === w.id) }; });
+    let materialSelectorHtml = '';
+    appData.warehouses.forEach(w => {
+        const models = modelsByWarehouse[w.id].models;
+        if (models.length > 0) {
+            materialSelectorHtml += `<div style="padding: 0.5rem 1rem; background: var(--bg-tertiary); font-weight: 600; font-size: 0.85rem;">${w.name}</div>`;
+            models.forEach(model => {
+                const category = appData.categories.find(c => c.id === model.categoryId);
+                const existingMat = job.materials ? job.materials.find(m => m.modelId === model.id) : null;
+                const qty = existingMat ? existingMat.quantity : 0;
+                materialSelectorHtml += `<div class="material-selector-item"><div><div style="font-weight: 500;">${model.name}</div><div style="font-size: 0.8rem; color: var(--text-muted);">${category ? category.name : ''}</div></div><input type="number" min="0" value="${qty}" data-model-id="${model.id}" class="model-qty-input"></div>`;
+            });
+        }
+    });
+    if (!materialSelectorHtml) materialSelectorHtml = '<p style="padding: 1rem; color: var(--text-muted);">Nessun modello disponibile.</p>';
+    let externalMaterialsHtml = '';
+    if (job.externalMaterials && job.externalMaterials.length > 0) {
+        job.externalMaterials.forEach(mat => {
+            externalMaterialsHtml += `<div class="external-material-row"><input type="text" placeholder="Nome" class="ext-name" value="${mat.name || ''}"><input type="number" min="1" value="${mat.quantity || 1}" placeholder="Qtà" class="ext-qty"><input type="text" placeholder="Fornitore" class="ext-supplier" value="${mat.supplier || ''}"><input type="number" min="0" step="0.01" placeholder="Prezzo €" class="ext-price" value="${mat.price || ''}"><button type="button" onclick="this.parentElement.remove()">✗</button></div>`;
+        });
+    }
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Modifica Lavoro</h2>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div class="form-group"><label class="form-label">Nome Lavoro *</label><input type="text" class="form-input" id="jobName" value="${job.name}"></div>
+            <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-input" id="jobDate" value="${job.date}"></div>
+            <div class="form-group"><label class="form-label">Note</label><textarea class="form-textarea" id="jobNotes">${job.notes || ''}</textarea></div>
+            <div class="form-group"><label class="form-label">Materiale dal magazzino</label><div class="material-selector">${materialSelectorHtml}</div></div>
+            <div class="form-group"><label class="form-label">Materiale da acquistare/noleggiare</label><div id="externalMaterialsList" class="external-materials-list">${externalMaterialsHtml}</div><button type="button" class="add-external-btn" onclick="addExternalMaterialRow()">+ Aggiungi materiale esterno</button></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="updateJob('${jobId}')">Salva</button>
+        </div>
+    `);
+}
+
+function updateJob(jobId) {
+    const job = appData.jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const name = document.getElementById('jobName').value.trim();
+    const date = document.getElementById('jobDate').value;
+    const notes = document.getElementById('jobNotes').value.trim();
+    if (!name) { showToast('Inserisci il nome del lavoro', 'error'); return; }
+    if (!date) { showToast('Inserisci la data', 'error'); return; }
+    const materials = [];
+    document.querySelectorAll('.model-qty-input').forEach(input => {
+        const qty = parseInt(input.value) || 0;
+        if (qty > 0) materials.push({ modelId: input.dataset.modelId, quantity: qty });
+    });
+    job.name = name; job.date = date; job.notes = notes;
+    job.materials = materials; job.externalMaterials = collectExternalMaterials();
+    saveData(); closeModal(); renderJobsView();
+    showToast('Lavoro aggiornato');
+}
+
+// =====================================================
+// NAVIGATION
+// =====================================================
+function goBack() {
+    if (currentView.modelId && currentView.categoryId) {
+        renderModels(currentView.categoryId, currentView.subcategoryId);
+    }
+}
+
+// =====================================================
+// EXPORT / IMPORT
+// =====================================================
+function exportData() {
+    const dataStr = JSON.stringify(appData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+    const filename = `magazzino-backup-${dateStr}_${timeStr}.json`;
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    showToast('Backup esportato con successo');
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (!importedData.categories || !importedData.models || !importedData.units || !importedData.movements) {
+                throw new Error('Struttura file non valida');
+            }
+            if (!confirm(`Importare questo backup?\n\n- ${importedData.categories.length} categorie\n- ${importedData.models.length} modelli\n- ${importedData.units.length} unità\n- ${importedData.movements.length} movimenti\n- Versione: ${importedData.version || 0}\n\nI dati attuali verranno sovrascritti.`)) return;
+            appData = migrateData(importedData);
+            saveData(); goToGeneralHome();
+            showToast('Backup importato con successo');
+        } catch (error) {
+            showToast('Errore: file non valido', 'error');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// =====================================================
+// STARTUP
+// =====================================================
+(function init() {
+    const fbReady = initFirebase();
+
+    if (fbReady && auth) {
+        // Firebase is configured: listen for auth state
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Check email whitelist
+                if (AUTHORIZED_EMAILS.length > 0 && !AUTHORIZED_EMAILS.includes(user.email)) {
+                    await auth.signOut();
+                    const errEl = document.getElementById('loginError');
+                    errEl.textContent = `Accesso negato. Email ${user.email} non autorizzata.`;
+                    errEl.style.display = 'block';
+                    return;
+                }
+                currentUser = user;
+                await startApp(user);
+            } else {
+                // Not logged in: show login screen
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainApp').style.display = 'none';
+            }
+        });
+    } else {
+        // Firebase not configured: skip login, use localStorage
+        document.getElementById('loginScreen').classList.add('hidden');
+        startApp(null);
+    }
+})();
+</script>
+</body>
+</html>
