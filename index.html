@@ -160,10 +160,13 @@
         }
         #scannerPage.hidden { display: none; }
 
+        /* Header scanner — overlay trasparente in cima */
         .scanner-header {
+            position: absolute; top: 0; left: 0; right: 0;
             padding: 1rem 1.5rem;
-            background: rgba(0,0,0,0.8);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%);
             display: flex; align-items: center; justify-content: space-between;
+            z-index: 10;
         }
 
         .scanner-title {
@@ -172,26 +175,143 @@
             font-size: 1rem;
         }
 
+        /* Reader occupa tutto lo schermo */
         #reader {
-            flex: 1;
-            min-height: 0;
+            position: absolute; inset: 0;
+            width: 100% !important;
+            height: 100% !important;
         }
 
+        /* Nascondi UI di default della libreria */
         #reader > div { border-radius: 0 !important; }
+        #reader img { display: none !important; }
+        #reader__dashboard { display: none !important; }
+        #reader__scan_region { width: 100% !important; height: 100% !important; }
+        #reader__scan_region video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
 
+        /* Mirino grafico overlay — solo estetico */
+        .scanner-viewfinder {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -60%);
+            width: min(65vw, 260px);
+            height: min(65vw, 260px);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .scanner-viewfinder::before,
+        .scanner-viewfinder::after {
+            content: '';
+            position: absolute;
+            width: 30px; height: 30px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+
+        .scanner-viewfinder::before {
+            top: 0; left: 0;
+            border-width: 3px 0 0 3px;
+            border-radius: 4px 0 0 0;
+        }
+
+        .scanner-viewfinder::after {
+            bottom: 0; right: 0;
+            border-width: 0 3px 3px 0;
+            border-radius: 0 0 4px 0;
+        }
+
+        .scanner-viewfinder-tr,
+        .scanner-viewfinder-bl {
+            position: absolute;
+            width: 30px; height: 30px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+
+        .scanner-viewfinder-tr {
+            top: 0; right: 0;
+            border-width: 3px 3px 0 0;
+            border-radius: 0 4px 0 0;
+        }
+
+        .scanner-viewfinder-bl {
+            bottom: 0; left: 0;
+            border-width: 0 0 3px 3px;
+            border-radius: 0 0 0 4px;
+        }
+
+        /* Linea di scansione animata */
+        .scanner-line {
+            position: absolute;
+            left: 4px; right: 4px;
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--accent), transparent);
+            animation: scanLine 2s ease-in-out infinite;
+            top: 0;
+        }
+
+        @keyframes scanLine {
+            0% { top: 4px; opacity: 1; }
+            90% { top: calc(100% - 4px); opacity: 1; }
+            100% { top: calc(100% - 4px); opacity: 0; }
+        }
+
+        /* Hint testo sotto il mirino */
+        .scanner-hint {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, calc(-60% + min(65vw, 260px)/2 + 20px));
+            color: rgba(255,255,255,0.8);
+            font-size: 0.8rem;
+            text-align: center;
+            z-index: 5;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        /* Result panel — slide up dal basso */
         .scanner-result {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
             background: var(--bg-secondary);
             border-top: 1px solid var(--border);
-            padding: 1.5rem;
-            min-height: 160px;
+            border-radius: 16px 16px 0 0;
+            padding: 1.25rem;
+            z-index: 10;
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .scanner-result.visible {
+            transform: translateY(0);
         }
 
         .scanner-result-title {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
             color: var(--text-muted);
             margin-bottom: 0.75rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .scanner-result-title::before {
+            content: '';
+            display: block;
+            width: 32px; height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 0 auto 0.75rem;
+            position: absolute;
+            top: 0.5rem; left: 50%;
+            transform: translateX(-50%);
         }
 
         .scanner-unit-card {
@@ -201,10 +321,10 @@
             padding: 1rem;
         }
 
-        .scanner-unit-name { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .scanner-unit-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
         .scanner-unit-serial { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; }
-
         .scanner-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .scanner-actions .btn { flex: 1; justify-content: center; }
 
         /* ===== QR MODAL ===== */
         .qr-container {
@@ -750,9 +870,9 @@
 
             .bottom-nav-icon { font-size: 1.3rem; line-height: 1; }
 
-            /* Scanner page mobile */
-            #reader { max-height: 55vh; }
-            .scanner-result { padding: 1rem; }
+            /* Scanner page mobile — fullscreen, no constraints */
+            #reader { position: absolute; inset: 0; }
+            #reader__scan_region video { object-fit: cover !important; }
 
             /* QR modal mobile */
             .qr-container { padding: 0.5rem; }
@@ -797,16 +917,29 @@
 
 <!-- ===== SCANNER PAGE ===== -->
 <div id="scannerPage" class="hidden">
+    <!-- Header overlay -->
     <div class="scanner-header">
         <span class="scanner-title">📷 SCANNER QR</span>
         <button class="btn btn-secondary btn-sm" onclick="closeScanner()">✕ Chiudi</button>
     </div>
+
+    <!-- Camera fullscreen -->
     <div id="reader"></div>
-    <div class="scanner-result">
-        <div class="scanner-result-title">RISULTATO SCANSIONE</div>
-        <div id="scannerResultContent">
-            <p style="color: var(--text-muted);">Punta la fotocamera verso un QR code del prodotto...</p>
-        </div>
+
+    <!-- Mirino grafico -->
+    <div class="scanner-viewfinder">
+        <div class="scanner-viewfinder-tr"></div>
+        <div class="scanner-viewfinder-bl"></div>
+        <div class="scanner-line"></div>
+    </div>
+
+    <!-- Hint -->
+    <div class="scanner-hint">Inquadra il QR code</div>
+
+    <!-- Result panel — slide up dopo scansione -->
+    <div class="scanner-result" id="scannerResult">
+        <div class="scanner-result-title">RISULTATO</div>
+        <div id="scannerResultContent"></div>
     </div>
 </div>
 
@@ -1250,7 +1383,7 @@ function generateQRCode(unitId) {
             </div>
         </div>
         <div class="modal-footer" style="justify-content: center; gap: 1rem;">
-            <button class="btn btn-secondary" onclick="downloadQR('${unit.serialNumber}')">💾 Salva immagine</button>
+            <button class="btn btn-secondary" onclick="downloadQR('${unitId}')">💾 Salva immagine</button>
             <button class="btn btn-primary" onclick="printQRLabel('${unitId}')">🖨️ Stampa etichetta</button>
         </div>
     `);
@@ -1271,13 +1404,14 @@ function generateQRCode(unitId) {
     }, 100);
 }
 
-function downloadQR(serialNumber) {
+function downloadQR(unitId) {
     const qrEl = document.querySelector('#qrCodeCanvas canvas') || document.querySelector('#qrCodeCanvas img');
     if (!qrEl) { showToast('QR non ancora generato', 'error'); return; }
 
-    const unit = appData.units.find(u => u.serialNumber === serialNumber);
+    const unit = appData.units.find(u => u.id === unitId);
     const model = unit ? appData.models.find(m => m.id === unit.modelId) : null;
     const modelName = model ? model.name : '';
+    const serialNumber = unit ? unit.serialNumber : unitId;
 
     let qrSrc = qrEl.tagName === 'CANVAS' ? qrEl.toDataURL('image/png') : qrEl.src;
 
@@ -1359,11 +1493,16 @@ function printQRLabel(unitId) {
 // =====================================================
 let html5QrCode = null;
 let scannerActive = false;
+let scannerResultVisible = false;
 
 function openScannerPage() {
     document.getElementById('scannerPage').classList.remove('hidden');
-    document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--text-muted);">Punta la fotocamera verso un QR code del prodotto...</p>';
-    
+    // Reset result panel
+    const resultEl = document.getElementById('scannerResult');
+    resultEl.classList.remove('visible');
+    document.getElementById('scannerResultContent').innerHTML = '';
+    scannerResultVisible = false;
+
     setTimeout(() => {
         startScanner();
     }, 300);
@@ -1373,42 +1512,81 @@ function closeScanner() {
     if (html5QrCode && scannerActive) {
         html5QrCode.stop().catch(() => {});
         scannerActive = false;
+        html5QrCode = null;
     }
     document.getElementById('scannerPage').classList.add('hidden');
+    document.getElementById('scannerResult').classList.remove('visible');
+    scannerResultVisible = false;
+}
+
+function showScannerResult(html) {
+    document.getElementById('scannerResultContent').innerHTML = html;
+    const resultEl = document.getElementById('scannerResult');
+    resultEl.classList.add('visible');
+    scannerResultVisible = true;
+
+    // Stop camera after successful scan
+    if (html5QrCode && scannerActive) {
+        html5QrCode.stop().catch(() => {});
+        scannerActive = false;
+    }
 }
 
 function startScanner() {
     if (typeof Html5Qrcode === 'undefined') {
-        document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--danger);">Libreria scanner non disponibile. Verifica la connessione internet.</p>';
+        showScannerResult('<p style="color: var(--danger);">Libreria scanner non disponibile.</p>');
         return;
     }
 
+    // Clean up previous instance
+    if (html5QrCode) {
+        try { html5QrCode.stop().catch(() => {}); } catch(e) {}
+        html5QrCode = null;
+    }
+
     html5QrCode = new Html5Qrcode('reader');
-    
-    Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras || cameras.length === 0) {
-            document.getElementById('scannerResultContent').innerHTML = '<p style="color: var(--danger);">Nessuna fotocamera trovata.</p>';
-            return;
-        }
 
-        // Prefer back camera
-        const camera = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
-
-        html5QrCode.start(
-            camera.id,
-            { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
-            (decodedText) => {
+    // Use environment camera (back) directly — no need to list cameras
+    html5QrCode.start(
+        { facingMode: 'environment' },
+        {
+            fps: 15,
+            // No qrbox — scan on entire video area
+            qrbox: undefined,
+            aspectRatio: undefined,
+            disableFlip: false
+        },
+        (decodedText) => {
+            if (!scannerResultVisible) {
                 handleQRScan(decodedText);
-            },
-            () => {} // ignore errors
-        ).then(() => {
-            scannerActive = true;
-        }).catch(err => {
-            document.getElementById('scannerResultContent').innerHTML = `<p style="color: var(--danger);">Errore fotocamera: ${err}</p>`;
-        });
-
+            }
+        },
+        () => {} // ignore frame errors
+    ).then(() => {
+        scannerActive = true;
     }).catch(err => {
-        document.getElementById('scannerResultContent').innerHTML = `<p style="color: var(--danger);">Errore accesso fotocamera: ${err}</p>`;
+        // Fallback: try listing cameras
+        Html5Qrcode.getCameras().then(cameras => {
+            if (!cameras || cameras.length === 0) {
+                showScannerResult('<p style="color: var(--danger);">Nessuna fotocamera trovata.</p>');
+                return;
+            }
+            const camera = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+            html5QrCode.start(
+                camera.id,
+                { fps: 15, qrbox: undefined, aspectRatio: undefined },
+                (decodedText) => {
+                    if (!scannerResultVisible) handleQRScan(decodedText);
+                },
+                () => {}
+            ).then(() => {
+                scannerActive = true;
+            }).catch(e => {
+                showScannerResult(`<p style="color: var(--danger);">Errore fotocamera: ${e}</p>`);
+            });
+        }).catch(e => {
+            showScannerResult(`<p style="color: var(--danger);">Errore accesso fotocamera: ${e}</p>`);
+        });
     });
 }
 
@@ -1416,8 +1594,12 @@ function handleQRScan(qrText) {
     // Parse format: MAGAZZINO:{modelId}|UNIT:{unitId}|SERIAL:{serial}
     const parts = {};
     qrText.split('|').forEach(part => {
-        const [key, val] = part.split(':');
-        if (key && val) parts[key.trim()] = val.trim();
+        const idx = part.indexOf(':');
+        if (idx > -1) {
+            const key = part.substring(0, idx).trim();
+            const val = part.substring(idx + 1).trim();
+            if (key && val) parts[key] = val;
+        }
     });
 
     const unitId = parts['UNIT'];
@@ -1425,24 +1607,28 @@ function handleQRScan(qrText) {
     const model = unit ? appData.models.find(m => m.id === unit.modelId) : null;
 
     if (!unit || !model) {
-        // Also try serial search as fallback
+        // Fallback: search by serial
         const serial = parts['SERIAL'];
         const unitBySerial = serial ? appData.units.find(u => u.serialNumber === serial) : null;
         if (unitBySerial) {
             handleQRScan(`MAGAZZINO:${unitBySerial.modelId}|UNIT:${unitBySerial.id}|SERIAL:${unitBySerial.serialNumber}`);
             return;
         }
-        document.getElementById('scannerResultContent').innerHTML = `
+        showScannerResult(`
             <p style="color: var(--warning);">⚠️ Prodotto non riconosciuto.</p>
-            <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Dati letti: ${qrText}</p>
-        `;
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Dati: ${qrText}</p>
+            <button class="btn btn-secondary" style="margin-top: 0.75rem; width: 100%;" onclick="resumeScanner()">🔄 Riprova</button>
+        `);
         return;
     }
 
     const isAvailable = unit.location === 'Magazzino';
     const warehouse = appData.warehouses.find(w => w.id === model.warehouseId);
 
-    document.getElementById('scannerResultContent').innerHTML = `
+    // Vibrate on success (mobile)
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    showScannerResult(`
         <div class="scanner-unit-card">
             <div class="scanner-unit-name">${model.name}</div>
             <div class="scanner-unit-serial">S/N: ${unit.serialNumber} · ${warehouse ? warehouse.name : ''}</div>
@@ -1455,10 +1641,21 @@ function handleQRScan(qrText) {
                     ? `<button class="btn btn-secondary" onclick="scannerRentUnit('${unit.id}')">📤 Registra Uscita</button>`
                     : `<button class="btn btn-primary" onclick="scannerReturnUnit('${unit.id}')">📥 Registra Rientro</button>`
                 }
-                <button class="btn btn-secondary" onclick="closeScanner(); goToUnitFromGeneral('${unit.id}')">👁 Dettaglio</button>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="closeScanner(); goToUnitFromGeneral('${unit.id}')">👁 Dettaglio</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="resumeScanner()">🔄 Scansiona altro</button>
             </div>
         </div>
-    `;
+    `);
+}
+
+function resumeScanner() {
+    // Hide result and restart camera
+    document.getElementById('scannerResult').classList.remove('visible');
+    document.getElementById('scannerResultContent').innerHTML = '';
+    scannerResultVisible = false;
+    setTimeout(() => startScanner(), 200);
 }
 
 function scannerReturnUnit(unitId) {
@@ -1468,20 +1665,19 @@ function scannerReturnUnit(unitId) {
 }
 
 function scannerRentUnit(unitId) {
-    // Stop scanner, show rent form in a small modal overlay
     const unit = appData.units.find(u => u.id === unitId);
     if (!unit) return;
 
     document.getElementById('scannerResultContent').innerHTML = `
         <div class="scanner-unit-card">
-            <div class="scanner-unit-name" style="margin-bottom: 0.75rem;">Registra Uscita</div>
+            <div class="scanner-unit-name" style="margin-bottom: 0.75rem;">📤 Registra Uscita</div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <input type="text" id="scannerDestination" placeholder="Destinazione..." style="padding: 0.6rem; background: #222; border: 1px solid #444; border-radius: 6px; color: white; font-size: 0.9rem; font-family: inherit;">
                 <input type="date" id="scannerReturnDate" style="padding: 0.6rem; background: #222; border: 1px solid #444; border-radius: 6px; color: white; font-size: 0.9rem; font-family: inherit;">
             </div>
             <div class="scanner-actions">
                 <button class="btn btn-primary" onclick="confirmScannerRent('${unitId}')">✓ Conferma</button>
-                <button class="btn btn-secondary" onclick="openScannerPage()">✕ Annulla</button>
+                <button class="btn btn-secondary" onclick="resumeScanner()">✕ Annulla</button>
             </div>
         </div>
     `;
